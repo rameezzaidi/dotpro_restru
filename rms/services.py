@@ -327,6 +327,7 @@ def queue_position(order):
 
 
 # ------------------------------------------------------------------ stock
+@transaction.atomic
 def adjust_stock(branch, ingredient, delta, reason, ref="", note="", user=None):
     stock, _ = Stock.objects.select_for_update().get_or_create(branch=branch, ingredient=ingredient)
     stock.quantity = stock.quantity + Decimal(delta)

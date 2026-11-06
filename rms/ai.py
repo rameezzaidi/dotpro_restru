@@ -17,7 +17,7 @@ from datetime import timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from django.db.models import Avg, Count, Sum
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 
 from . import services as svc
@@ -94,7 +94,7 @@ def parse_json(text):
 def usage(days=30):
     since = timezone.now() - timedelta(days=days)
     qs = AILog.objects.filter(created_at__gte=since)
-    rows = list(qs.values("kind").annotate(n=Count("id"), llm=Sum("used_llm"), avg=Avg("ms")).order_by("-n"))
+    rows = list(qs.values("kind").annotate(n=Count("id"), llm=Count("id", filter=Q(used_llm=True)), avg=Avg("ms")).order_by("-n"))
     tot = qs.count()
     return {"rows": rows, "total": tot, "llm": qs.filter(used_llm=True, ok=True).count(), "failed": qs.filter(ok=False).count(),
             "recent_errors": list(qs.filter(ok=False).values_list("error", flat=True)[:3])}
