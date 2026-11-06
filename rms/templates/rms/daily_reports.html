@@ -1,0 +1,8 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Daily reports</h1><p>Built automatically after the closing hour set in Automations; also sent to managers by email / WhatsApp when connected.</p></div>
+  <form method="post">{% csrf_token %}<button class="btn primary">Build today's report now</button></form></div>
+{% for r in reports %}<div class="card" style="margin-bottom:12px"><div class="card-h"><h2>{{ r.branch.name }} - {{ r.date|date:"D d M Y" }}</h2><span class="badge b-green">{{ r.orders }} orders</span></div>
+<div class="card-b"><pre style="margin:0;white-space:pre-wrap;font:inherit;line-height:1.7">{{ r.text }}</pre><button class="btn sm" style="margin-top:10px" onclick="window.print()">Print</button></div></div>
+{% empty %}<div class="card empty">No reports yet - press "Build today's report now" or wait for the closing hour.</div>{% endfor %}
+{% endblock %}

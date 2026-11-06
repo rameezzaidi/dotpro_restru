@@ -1,0 +1,11 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="{{ lang }}" dir="{{ lang_dir }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#faf6ef">
+<title>Order online · {{ setting.business_name }}</title><link rel="stylesheet" href="{% static 'rms/site.css' %}"></head>
+<body class="site">
+<header class="sx-hero"><span class="sx-brand"><span class="logo">{% icon 'store' 16 %}</span>{{ setting.business_name }}</span>
+  <h1>Fresh from our kitchen,<br><em>straight to your door</em></h1><p>Choose your nearest branch to browse the menu and place your order in a minute.</p></header>
+<div class="sx-branches">
+  {% for b in branches %}<a class="sx-bcard" href="{% url 'site_menu' b.code %}"><span class="sx-bico">{% icon 'store' 24 %}</span>
+    <div><b>{{ b.name }}</b><div class="a">{{ b.address }}{% if b.phone %} · {{ b.phone }}{% endif %}</div></div><span class="sx-go">Order {% icon 'arrow' 14 %}</span></a>
+  {% empty %}<div class="sx-bcard" style="justify-content:center;color:var(--mut)">Online ordering is currently unavailable.</div>{% endfor %}
+</div></body></html>

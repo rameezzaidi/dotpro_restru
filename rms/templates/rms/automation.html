@@ -1,0 +1,56 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Automations</h1><p>Things the system now does by itself. Turn each one on or off, and see what it did.</p></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <form method="post" action="{% url 'automation_action' %}">{% csrf_token %}<button class="btn primary" name="action" value="run">Run all now</button></form>
+    <form method="post" action="{% url 'automation_action' %}">{% csrf_token %}<button class="btn" name="action" value="sync">Push menu to apps</button></form></div></div>
+
+<div class="cols" style="align-items:start">
+<form method="post" class="card">{% csrf_token %}
+  <div class="card-h"><h2>Settings</h2></div>
+  <div class="card-b" style="display:grid;gap:18px">
+  {% for title, fields in sections %}<div><div class="small muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">{{ title }}</div>
+    <div style="display:grid;gap:10px">{% for f in fields %}
+      <label style="display:grid;gap:4px;{% if f.field.widget.input_type == 'checkbox' %}grid-template-columns:auto 1fr;align-items:start;column-gap:10px{% endif %}">
+        {% if f.field.widget.input_type == 'checkbox' %}{{ f }}<span><b style="font-weight:600">{{ f.label }}</b><span class="small muted" style="display:block">{{ f.help_text }}</span></span>
+        {% else %}<span class="small"><b style="font-weight:600">{{ f.label }}</b> <span class="muted">{{ f.help_text }}</span></span>{{ f }}{% endif %}</label>{% endfor %}</div></div>{% endfor %}
+  <button class="btn primary">Save settings</button></div></form>
+
+<div style="display:grid;gap:16px">
+  <div class="card"><div class="card-h"><h2>Status</h2></div><div class="card-b">
+    {% for label, ok in env %}<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>{{ label }}</span>{% if ok %}<span class="badge b-green">Connected</span>{% else %}<span class="badge b-amber">Not set</span>{% endif %}</div>{% endfor %}
+    <p class="small muted" style="margin:10px 0 0">Without keys, messages are only <b>recorded</b> in the log below - nothing is sent. Add the keys as environment variables (see README) to send them for real.</p>
+    <p class="small muted" style="margin:6px 0 0">Last run: {% if last %}{{ last.created_at|date:"d M H:i:s" }} - {{ last.note }}{% else %}never{% endif %}</p></div></div>
+
+  <div class="card"><div class="card-h"><h2>Quick links</h2></div><div class="card-b" style="display:grid;gap:8px">
+    <a class="btn" href="{% url 'smart_order' %}">Smart ordering (forecast) -></a><a class="btn" href="{% url 'daily_reports' %}">Daily reports -></a>
+    <a class="btn" href="{% url 'slips' %}">Salary slips -></a><a class="btn" href="{% url 'channels' %}">Delivery apps / webhook URLs -></a></div></div>
+</div></div>
+
+<div class="card" style="margin-top:18px"><div class="card-h"><h2>Happy hour / slow-hour pricing</h2><span class="small muted">Applies automatically to POS, website and apps in those hours</span></div>
+<div class="tbl-wrap"><table class="tbl" data-plain><thead><tr><th>Rule</th><th>Branch</th><th>Hours</th><th>Days</th><th>Discount</th><th></th></tr></thead><tbody>
+{% for r in rules %}<tr><td><b>{{ r.name }}</b> {% if not r.is_active %}<span class="badge b-amber">off</span>{% endif %}</td><td>{{ r.branch.code|default:"All" }}</td><td>{{ r.start_hour }}:00 - {{ r.end_hour }}:00</td>
+  <td class="small">{% for d in day_names %}{% if forloop.counter0|stringformat:"d" in r.days %}{{ d }} {% endif %}{% endfor %}</td><td>{{ r.percent|num }}%</td>
+  <td class="right nowrap"><form method="post" action="{% url 'automation_action' %}" style="display:inline">{% csrf_token %}<input type="hidden" name="id" value="{{ r.pk }}">
+    <button class="btn sm" name="action" value="rule_toggle">{% if r.is_active %}Turn off{% else %}Turn on{% endif %}</button> <button class="btn sm" name="action" value="rule_delete">Delete</button></form></td></tr>
+{% empty %}<tr><td colspan="6" class="empty">No rules yet.</td></tr>{% endfor %}</tbody></table></div>
+<form method="post" action="{% url 'automation_action' %}" class="card-b" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;border-top:1px solid var(--line)">{% csrf_token %}<input type="hidden" name="action" value="rule_add">
+  <label class="small">Name<input class="input" name="name" value="Happy hour" style="width:150px"></label>
+  <label class="small">Branch<select class="input" name="branch"><option value="">All</option>{% for b in all_branches %}<option value="{{ b.pk }}">{{ b.code }}</option>{% endfor %}</select></label>
+  <label class="small">From<input class="input" type="number" name="start" min="0" max="23" value="15" style="width:70px"></label>
+  <label class="small">To<input class="input" type="number" name="end" min="1" max="24" value="18" style="width:70px"></label>
+  <label class="small">% off<input class="input" type="number" name="percent" step="0.5" value="10" style="width:80px"></label>
+  <span class="small">{% for d in day_names %}<label style="margin-right:6px"><input type="checkbox" name="days" value="{{ forloop.counter0 }}" checked> {{ d }}</label>{% endfor %}</span>
+  <button class="btn primary">Add rule</button></form>
+{% if suggest %}<div class="card-b" style="border-top:1px solid var(--line)"><b>AI suggestions</b> <span class="small muted">- hours with fewer than 40% of the busiest hour's orders (last 28 days)</span>
+  {% for s in suggest %}<form method="post" action="{% url 'automation_action' %}" style="display:flex;gap:10px;align-items:center;margin-top:8px">{% csrf_token %}
+    <input type="hidden" name="action" value="rule_suggest"><input type="hidden" name="branch" value="{{ s.branch.pk }}"><input type="hidden" name="start" value="{{ s.start }}"><input type="hidden" name="end" value="{{ s.end }}"><input type="hidden" name="percent" value="{{ s.pct }}"><input type="hidden" name="name" value="Slow hours">
+    <span>{{ s.branch.code }}: quiet {{ s.start }}:00-{{ s.end }}:00 -> {{ s.pct }}% off</span><button class="btn sm">Create rule</button></form>{% endfor %}</div>{% endif %}</div>
+
+<div class="card" style="margin-top:18px"><div class="card-h"><h2>Message log</h2><span class="small muted">last 60 - customers, suppliers, staff, apps</span></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>When</th><th>Type</th><th>To</th><th>Message</th><th>Status</th></tr></thead><tbody>
+{% for m in msgs %}<tr><td class="small muted nowrap">{{ m.created_at|date:"d M H:i" }}</td><td>{{ m.get_channel_display }}<div class="small muted">{{ m.kind }}</div></td><td class="small">{{ m.to }}</td>
+  <td class="small" style="max-width:420px;white-space:pre-line">{{ m.body|truncatechars:160 }}</td>
+  <td>{% if m.status == "sent" %}<span class="badge b-green">Sent</span>{% elif m.status == "failed" %}<span class="badge b-red" title="{{ m.error }}">Failed</span>{% else %}<span class="badge b-amber" title="{{ m.error }}">Recorded only</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="5" class="empty">No messages yet. They appear when orders, purchase orders or reports trigger them.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

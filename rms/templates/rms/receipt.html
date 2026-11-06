@@ -1,0 +1,35 @@
+{% load rms_tags %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Receipt {{ o.number }}</title>
+{% load static %}<link rel="stylesheet" href="{% static 'rms/app.css' %}"></head>
+<body style="background:#f4f4f4">
+<div class="receipt">
+  <div style="text-align:center"><b style="font-size:16px">{{ o.branch.name }}</b><br>{{ o.branch.address }}<br>{{ o.branch.phone }}</div>
+  <hr>
+  <div style="text-align:center;font-weight:700;letter-spacing:.08em">{% if o.bill_number %}BILL / INVOICE{% else %}PROVISIONAL BILL{% endif %}</div>
+  {% if o.bill_number %}<div class="r"><span>Bill no.</span><b>{{ o.bill_number }}</b></div>{% endif %}
+  <div class="r"><span>Order</span><span>{{ o.number }}</span></div>
+  <div class="r"><span>Type</span><span>{{ o.get_order_type_display }}{% if o.table %} · {{ o.table.name }}{% endif %}</span></div>
+  <div class="r"><span>Date</span><span>{{ o.billed_at|default:o.created_at|date:"d/m/Y H:i" }}</span></div>
+  {% if o.parent %}<div class="r"><span>Split from</span><span>{{ o.parent.number }}</span></div>{% endif %}
+  {% if o.waiter %}<div class="r"><span>Waiter</span><span>{{ o.waiter.display_name }}</span></div>{% endif %}
+  {% if o.customer_name %}<div class="r"><span>Customer</span><span>{{ o.customer_name }}</span></div>{% endif %}
+  <hr>
+  {% for l in lines %}<div class="r"><span>{{ l.qty }} × {{ l.name }}</span><span>{{ l.line_total|floatformat:2 }}</span></div>{% endfor %}
+  <hr>
+  <div class="r"><span>Subtotal</span><span>{{ o.subtotal|floatformat:2 }}</span></div>
+  {% if o.discount %}<div class="r"><span>Discount</span><span>-{{ o.discount|floatformat:2 }}</span></div>{% endif %}
+  {% if o.service_charge %}<div class="r"><span>Service</span><span>{{ o.service_charge|floatformat:2 }}</span></div>{% endif %}
+  {% if o.tax %}<div class="r"><span>Tax</span><span>{{ o.tax|floatformat:2 }}</span></div>{% endif %}
+  {% if o.delivery_fee %}<div class="r"><span>Delivery</span><span>{{ o.delivery_fee|floatformat:2 }}</span></div>{% endif %}
+  <div class="r" style="font-size:16px"><b>TOTAL ({{ o.branch.currency_code }})</b><b>{{ o.total|floatformat:2 }}</b></div>
+  {% for p in payments %}<div class="r"><span>{% if p.amount < 0 %}Refund{% else %}Paid{% endif %} · {{ p.get_method_display }}</span><span>{{ p.amount|floatformat:2 }}</span></div>
+  {% if p.tip %}<div class="r"><span>&nbsp;&nbsp;Tip</span><span>{{ p.tip|floatformat:2 }}</span></div>{% endif %}
+  {% if p.change %}<div class="r"><span>&nbsp;&nbsp;Cash received / change</span><span>{{ p.tendered|floatformat:2 }} / {{ p.change|floatformat:2 }}</span></div>{% endif %}{% endfor %}
+  <div class="r"><span>Status</span><b>{% if o.is_paid %}PAID{% elif payments %}PARTIAL · due {{ o.due|floatformat:2 }}{% else %}UNPAID{% endif %}</b></div>
+  <hr><div style="text-align:center">Thank you!
+  <div class="small" style="margin-top:6px">Rate your meal &amp; our service — scan:</div>
+  <div style="width:110px;margin:6px auto">{% qr_svg fb_url 3 %}</div><div style="font-size:10px;word-break:break-all">{{ fb_url }}</div></div>
+  <p class="no-print" style="text-align:center"><button onclick="window.print()" class="btn">Print</button></p>
+</div>
+<script>window.addEventListener("load", function(){ if (location.search.indexOf("print=1") > -1) window.print(); });</script>
+</body></html>

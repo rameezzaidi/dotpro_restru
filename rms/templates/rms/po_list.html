@@ -1,0 +1,11 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Purchase Orders" %}</h1><p>Order from suppliers, receive goods, stock updates automatically.</p></div>
+  <a class="btn primary" href="{% url 'po_create' %}">{% icon 'plus' 16 %} New purchase order</a></div>
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>{% tr "Branches" %}</th><th>{% tr "Suppliers" %}</th><th>{% tr "Status" %}</th><th class="right">{% tr "Total" %}</th><th>{% tr "Date" %}</th></tr></thead><tbody>
+{% for p in pos %}<tr><td><a href="{% url 'po_detail' p.pk %}"><b>{{ p.number }}</b></a></td><td>{{ p.branch.code }}</td><td>{{ p.supplier.name }}</td>
+  <td><span class="badge {% if p.status == 'received' %}b-green{% elif p.status == 'cancelled' %}b-red{% elif p.status == 'partial' %}b-blue{% else %}b-amber{% endif %}">{{ p.get_status_display }}</span></td>
+  <td class="right">{{ p.total|money:p.branch }}</td><td class="small muted">{{ p.created_at|date:"d M Y" }}</td></tr>
+{% empty %}<tr><td colspan="6" class="empty">No purchase orders yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

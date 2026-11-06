@@ -1,0 +1,11 @@
+{% load rms_tags %}<div class="card" style="margin-bottom:12px"><div class="card-b">
+  <div class="row" style="justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div><b style="font-size:17px">{{ o.number }}</b> <span class="small muted">{{ o.customer_name|default:"Customer" }}</span>
+      <div style="margin-top:4px">{% icon 'link' 14 %} {{ o.customer_address|default:"No address given" }}</div>
+      {% if o.customer_phone %}<div class="small"><a href="tel:{{ o.customer_phone }}">Call {{ o.customer_phone }}</a></div>{% endif %}
+      <div class="small muted" style="margin-top:4px">{% for l in o.lines.all %}{% if not l.is_void %}{{ l.qty }} × {{ l.name }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}</div>
+      {% if o.notes %}<div class="small" style="color:#b4532a">Note: {{ o.notes }}</div>{% endif %}</div>
+    <div style="text-align:end"><div class="muted small">{% if o.due > 0 %}Collect (cash){% else %}Paid online{% endif %}</div>
+      <div style="font-size:22px;font-weight:700">{{ o.due|money:o.branch }}</div>
+      <form method="post" action="{% url 'rider_action' o.pk %}" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="action" value="{{ act }}"><button class="btn primary">{{ label|safe }}</button></form></div>
+  </div></div></div>

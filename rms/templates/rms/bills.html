@@ -1,0 +1,41 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Bills</h1><p>Generated automatically when an order is completed.</p></div></div>
+<form method="get" class="filters">
+  <div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div>
+  <div><label class="small muted">{% tr "Type" %}</label><br><select class="input" name="type"><option value="">All</option>
+    {% for v, l in types %}<option value="{{ v }}" {% if f.type == v %}selected{% endif %}>{{ l|t:lang }}</option>{% endfor %}</select></div>
+  <div><label class="small muted">Payment</label><br><select class="input" name="method"><option value="">All</option>
+    {% for v, l in methods %}<option value="{{ v }}" {% if f.method == v %}selected{% endif %}>{{ l|t:lang }}</option>{% endfor %}</select></div>
+  <div><label class="small muted">{% tr "Search" %}</label><br><input class="input" name="q" value="{{ f.q }}" placeholder="Bill / order / customer"></div>
+  <button class="btn">{% icon 'search' 16 %}</button>
+</form>
+<div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
+  <span class="badge b-blue">{{ agg.n }} bills</span>
+  <span class="badge b-green">Sales {{ agg.total|default:0|floatformat:2 }}</span>
+  <span class="badge">Tax {{ agg.tax|default:0|floatformat:2 }}</span>
+</div>
+<div class="card tbl-wrap">
+  <table class="tbl" data-server="1"><thead><tr><th>Bill no.</th><th>{% tr "Orders" %}</th>{% if branch_all %}<th>{% tr "Branches" %}</th>{% endif %}<th>{% tr "Type" %}</th><th>Payment</th><th class="right" data-sum>{% tr "Total" %}</th><th>{% tr "Date" %}</th><th></th></tr></thead>
+  <tbody>
+  {% for o in page %}
+    <tr>
+      <td><a href="{% url 'receipt' o.pk %}" target="_blank"><b>{{ o.bill_number }}</b></a></td>
+      <td><a href="{% url 'order_detail' o.pk %}">{{ o.number }}</a>{% if o.table %}<div class="small muted">{{ o.table.name }}</div>{% endif %}</td>
+      {% if branch_all %}<td>{{ o.branch.code }}</td>{% endif %}
+      <td>{{ o.get_order_type_display|t:lang }}</td>
+      <td><span class="badge b-green">{{ o.get_payment_method_display }}</span></td>
+      <td class="right"><b>{{ o.total|money:o.branch }}</b></td>
+      <td class="small muted nowrap">{{ o.billed_at|date:"d M, H:i" }}</td>
+      <td class="right"><a class="btn sm" href="{% url 'receipt' o.pk %}?print=1" target="_blank">{% icon 'print' 14 %}</a></td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="empty">No bills for these filters.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% if page.has_other_pages %}<div class="row" style="margin-top:14px">
+  {% if page.has_previous %}<a class="btn sm" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">← Prev</a>{% endif %}
+  <span class="muted small">Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn sm" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">Next →</a>{% endif %}
+</div>{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Ingredients" %}</h1><p>Raw materials, live stock and alerts{% if branch %} — {{ branch.name }}{% else %} — all branches{% endif %}. Ingredients are linked to dishes through <a href="{% url 'recipes' %}">Recipes</a>.</p></div>
+  <div class="row"><a class="btn" href="{% url 'recipes' %}">{% icon 'book' 16 %} Recipes</a><a class="btn primary" href="{% url 'ingredients_add' %}">{% icon 'plus' 16 %} Add ingredient</a></div></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
+  <div class="card"><div class="card-b"><div class="muted small">Ingredients</div><div style="font-size:26px;font-weight:800">{{ total }}</div></div></div>
+  <a class="card" href="?show=low"><div class="card-b"><div class="muted small">Low stock</div><div style="font-size:26px;font-weight:800;color:var(--amber)">{{ counts.low }}</div></div></a>
+  <a class="card" href="?show=out"><div class="card-b"><div class="muted small">Out of stock</div><div style="font-size:26px;font-weight:800;color:var(--red)">{{ counts.out }}</div></div></a>
+  {% if branch %}<div class="card"><div class="card-b"><div class="muted small">Stock value (at cost)</div><div style="font-size:22px;font-weight:800">{{ value|money:branch }}</div></div></div>{% endif %}
+</div>
+<form method="get" class="filters">
+  <input class="input" name="q" value="{{ q }}" placeholder="{% tr 'Search' %}…">
+  <select class="input" name="cat"><option value="">All categories</option>{% for v, l in categories %}<option value="{{ v }}" {% if cat == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select class="input" name="show"><option value="">All</option><option value="low" {% if show == 'low' %}selected{% endif %}>Low / out</option><option value="out" {% if show == 'out' %}selected{% endif %}>Out of stock</option><option value="unused" {% if show == 'unused' %}selected{% endif %}>Not used in any dish</option></select>
+  <button class="btn">{% icon 'search' 16 %}</button></form>
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Ingredient</th><th>Category</th><th>Stock</th><th>Alert level</th><th>Status</th><th>Used in</th><th class="right">Cost / unit</th><th>Supplier</th><th class="right"></th></tr></thead><tbody>
+{% for r in rows %}<tr>
+  <td><a href="{% url 'ingredient_detail' r.ing.pk %}"><b>{{ r.ing.name }}</b></a></td>
+  <td class="small">{{ r.ing.get_category_display }}</td>
+  <td style="min-width:150px">{% if r.qty is not None %}<b>{{ r.qty|num }}</b> {{ r.ing.unit }}<div class="meter {{ r.status }}"><i style="width:{{ r.pct }}%"></i></div>{% else %}<span class="muted">—</span>{% endif %}</td>
+  <td class="small">{% if r.level %}{{ r.level|num }} {{ r.ing.unit }}{% else %}<span class="muted">not set</span>{% endif %}</td>
+  <td>{% if r.status == 'out' %}<span class="badge b-red">Out of stock</span>{% elif r.status == 'low' %}<span class="badge b-amber">Low</span>{% elif r.status == 'ok' %}<span class="badge b-green">OK</span>{% else %}<span class="badge b-grey">No stock</span>{% endif %}<div class="small muted">{{ r.note }}</div></td>
+  <td class="nowrap">{% if r.ing.dishes %}{{ r.ing.dishes }} dish{{ r.ing.dishes|pluralize:"es" }}{% else %}<span class="muted">unused</span>{% endif %}</td>
+  <td class="right">{{ r.ing.unit_cost|num }}</td><td class="small">{{ r.ing.default_supplier.name|default:"—" }}</td>
+  <td class="right"><a class="btn sm" href="{% url 'ingredient_detail' r.ing.pk %}">Open</a> <a class="btn sm" href="{% url 'ingredients_edit' r.ing.pk %}">{% icon 'edit' 14 %}</a></td></tr>
+{% empty %}<tr><td colspan="9" class="empty">No ingredients match.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

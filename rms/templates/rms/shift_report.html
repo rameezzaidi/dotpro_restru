@@ -1,0 +1,23 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Shift report #{{ sh.pk }} (Z-report)</h1><p>{{ sh.user.display_name }} · {{ sh.branch.name }} · {{ sh.opened_at|date:"d M Y, H:i" }} → {% if sh.closed_at %}{{ sh.closed_at|date:"H:i" }}{% else %}open{% endif %}</p></div>
+  <div class="row no-print"><button class="btn" onclick="window.print()">{% icon 'print' 16 %} Print</button><a class="btn" href="{% url 'shifts' %}">← Back</a></div></div>
+<div class="cols">
+  <div class="card"><div class="card-h"><h2>Payments by method</h2></div><div class="card-b">
+    {% for m, v in t.by_method.items %}<div class="row" style="justify-content:space-between;margin:6px 0"><span>{{ m|title }}</span><b>{{ v|money:sh.branch }}</b></div>{% empty %}<div class="muted">No payments in this shift.</div>{% endfor %}
+    <hr><div class="row" style="justify-content:space-between"><span>Total collected</span><b>{{ t.sales|money:sh.branch }}</b></div>
+    <div class="row" style="justify-content:space-between"><span>Tips</span><span>{{ t.tips|money:sh.branch }}</span></div>
+    <div class="row" style="justify-content:space-between"><span>Refunds</span><span>{{ t.refunds|money:sh.branch }}</span></div>
+    <div class="row" style="justify-content:space-between"><span>Orders</span><span>{{ t.count }}</span></div></div></div>
+  <div class="card"><div class="card-h"><h2>Cash drawer</h2></div><div class="card-b">
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>Opening cash</span><span>{{ sh.opening_cash|money:sh.branch }}</span></div>
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>+ Cash payments &amp; tips</span><span>{{ t.cash_in|money:sh.branch }}</span></div>
+    <hr><div class="row" style="justify-content:space-between;margin:6px 0"><b>Expected in drawer</b><b>{% if sh.expected_cash is not None %}{{ sh.expected_cash|money:sh.branch }}{% else %}{{ sh.opening_cash|add:t.cash_in|money:sh.branch }}{% endif %}</b></div>
+    {% if sh.closed_at %}<div class="row" style="justify-content:space-between;margin:6px 0"><span>Counted</span><b>{{ sh.counted_cash|money:sh.branch }}</b></div>
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>Difference</span><span class="badge {% if sh.difference == 0 %}b-green{% elif sh.difference < 0 %}b-red{% else %}b-amber{% endif %}">{{ sh.difference|money:sh.branch }}</span></div>
+    {% if sh.note %}<div class="small muted">{{ sh.note }}</div>{% endif %}{% endif %}</div></div>
+</div>
+<div class="card tbl-wrap" style="margin-top:16px"><table class="tbl"><thead><tr><th>Time</th><th>Order</th><th>Method</th><th class="right">Amount</th><th class="right">Tip</th></tr></thead><tbody>
+{% for p in pays %}<tr><td class="small">{{ p.created_at|date:"H:i" }}</td><td><a href="{% url 'order_detail' p.order_id %}">{{ p.order.number }}</a></td><td>{{ p.get_method_display }}</td><td class="right">{{ p.amount|money:sh.branch }}</td><td class="right">{{ p.tip|money:sh.branch }}</td></tr>
+{% empty %}<tr><td colspan="5" class="empty">No payments.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

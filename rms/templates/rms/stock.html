@@ -1,0 +1,27 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Stock" %}</h1><p>{{ branch.name }} — ingredients are deducted automatically from recipes the moment an order is placed.</p></div>
+  <div class="row"><a class="btn" href="{% url 'movements' %}">History</a><a class="btn" href="{% url 'transfers' %}">{% icon 'repeat' 16 %} {% tr "Stock Transfers" %}</a><form method="post" action="{% url 'po_from_low' %}" style="display:inline">{% csrf_token %}<button class="btn" title="One draft PO per supplier for everything at/below reorder level">{% icon 'truck' 16 %} Order low stock</button></form><a class="btn primary" href="{% url 'po_create' %}">{% icon 'plus' 16 %} {% tr "Purchase Orders" %}</a></div></div>
+<form method="get" class="filters"><input class="input" name="q" value="{{ q }}" placeholder="{% tr 'Search' %}…">
+  <label class="row"><input class="check" type="checkbox" name="low" value="1" {% if low %}checked{% endif %}> {% tr "Low stock" %} only</label><button class="btn">{% icon 'search' 16 %}</button></form>
+<div class="card tbl-wrap"><table class="tbl">
+  <thead><tr><th>{% tr "Ingredients" %}</th><th>{% tr "Quantity" %}</th><th>Reorder level</th><th>{% tr "Status" %}</th><th class="right">Adjust</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><b>{{ r.ing.name }}</b><div class="small muted">{{ r.ing.unit }}</div></td>
+      <td><b>{{ r.stock.quantity|num|default:"0" }}</b> {{ r.ing.unit }}</td>
+      <td>
+        <form method="post" action="{% url 'stock_reorder' r.ing.pk %}" class="row" style="flex-wrap:nowrap">{% csrf_token %}
+          <input class="input" name="reorder_level" type="number" step="0.001" min="0" value="{{ r.stock.reorder_level|default:0 }}" style="width:90px;padding:5px 8px">
+          <button class="btn sm">{% icon 'check' 14 %}</button></form></td>
+      <td>{% if r.stock and r.stock.is_low %}<span class="badge b-red">{% tr "Low stock" %}</span>{% elif r.stock %}<span class="badge b-green">OK</span>{% else %}<span class="badge b-grey">No stock</span>{% endif %}</td>
+      <td class="right">
+        <form method="post" action="{% url 'stock_adjust' r.ing.pk %}" class="row" style="flex-wrap:nowrap;justify-content:flex-end">{% csrf_token %}
+          <input class="input" name="delta" type="number" step="0.001" placeholder="± qty" style="width:90px;padding:5px 8px" required>
+          <select class="input" name="reason" style="width:120px;padding:5px 8px"><option value="adjustment">Adjustment</option><option value="opening">Opening</option><option value="wastage">Wastage</option></select>
+          <button class="btn sm">{% icon 'plus' 14 %}</button></form></td>
+    </tr>
+  {% empty %}<tr><td colspan="5" class="empty">No ingredients. Add them under Supply Chain → Ingredients.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

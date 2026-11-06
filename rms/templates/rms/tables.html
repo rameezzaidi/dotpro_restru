@@ -1,0 +1,33 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block head %}<meta http-equiv="refresh" content="30">{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% tr "Tables" %}</h1>
+    <p><span class="dot free"></span>{% tr "Free" %} {{ counts.free }} &nbsp; <span class="dot occupied"></span>{% tr "Occupied" %} {{ counts.occupied }} &nbsp; <span class="dot bill"></span>Bill {{ counts.bill }} &nbsp; <span class="dot cleaning"></span>Cleaning {{ counts.cleaning }} &nbsp; <span class="dot reserved"></span>{% tr "Reserved" %} {{ counts.reserved }}</p></div>
+  <div class="row"><a class="btn" href="{% url 'reservations' %}">{% icon 'calendar' 16 %} Reservations</a>
+  {% if request.user.role == 'manager' or request.user.role == 'owner' or request.user.is_superuser %}<a class="btn" href="{% url 'tables_manage' %}">{% icon 'edit' 16 %} Manage tables</a>{% endif %}</div>
+</div>
+{% for g in areas %}
+  <h3 style="margin:6px 0 10px">{{ g.area }}{% if g.branch %} <span class="muted small">· {{ g.branch.name }}</span>{% endif %}</h3>
+  <div class="floor">
+  {% for t in g.tables %}
+    <div class="tbl-card {{ t.status }}">
+      <a href="{% url 'table_open' t.pk %}" style="color:inherit;display:block">
+        <div class="row" style="justify-content:space-between"><span class="nm">{{ t.name }}</span><span class="small muted">{% icon 'users' 14 %} {{ t.capacity }}</span></div>
+        <div class="small" style="margin-top:4px"><span class="dot {{ t.status }}"></span>{{ t.get_status_display|t:lang }}</div>
+        {% if t.active_order %}<div class="small" style="margin-top:8px"><b>{{ t.active_order.number }}</b><br><span class="muted">{{ t.active_order.total|money:t.branch }} · {{ t.active_order.get_status_display }}</span>
+          {% if t.active_order.bill_requested_at %}<br><span class="badge b-amber">Bill requested</span>{% endif %}</div>
+        {% elif t.status == 'cleaning' %}<div class="small muted" style="margin-top:8px">Being cleaned</div>
+        {% else %}<div class="small muted" style="margin-top:8px">Tap to start an order</div>{% endif %}
+        {% if t.next_res %}<div class="small" style="margin-top:6px"><span class="badge b-blue">{{ t.next_res.at|date:"H:i" }} · {{ t.next_res.name }}</span></div>{% endif %}
+      </a>
+      {% if not t.active_order %}
+      <form method="post" action="{% url 'table_status' t.pk %}" style="margin-top:8px">{% csrf_token %}
+        {% if t.status == 'cleaning' %}<input type="hidden" name="status" value="free"><button class="btn sm primary">{% icon 'check' 14 %} Cleaned — free</button>
+        {% else %}<input type="hidden" name="status" value="{% if t.status == 'reserved' %}free{% else %}reserved{% endif %}">
+        <button class="btn sm">{% if t.status == 'reserved' %}Release{% else %}Reserve{% endif %}</button>{% endif %}</form>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+{% empty %}<div class="card empty">No tables yet. Add tables from “Manage tables”.</div>{% endfor %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Branch Menu — {{ branch.name }}</h1><p>Switch items on/off for this branch and set a local price (leave price empty to use the base price).</p></div></div>
+<form method="post">{% csrf_token %}
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>{% tr "Items" %}</th><th>{% tr "Categories" %}</th><th>Base price</th><th>Branch price</th><th>Available</th></tr></thead><tbody>
+{% for r in rows %}<tr><td><b>{{ r.item.name }}</b>{% if not r.item.is_active %} <span class="badge b-grey">inactive</span>{% endif %}</td><td>{{ r.item.category.name }}</td><td>{{ r.item.price|money }}</td>
+  <td><input class="input" style="width:120px;padding:5px 8px" type="number" step="0.01" min="0" name="price_{{ r.item.pk }}" value="{{ r.ov.price|default_if_none:'' }}"></td>
+  <td><input class="check" type="checkbox" name="avail_{{ r.item.pk }}" {% if not r.ov or r.ov.is_available %}checked{% endif %}></td></tr>{% endfor %}
+</tbody></table></div>
+<div class="row" style="margin-top:16px"><button class="btn primary">{% icon 'check' 16 %} {% tr "Save" %}</button></div>
+</form>
+{% endblock %}

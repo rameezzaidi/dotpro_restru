@@ -1,0 +1,14 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Stock" %} — {% tr "All branches" %}</h1><p>Master view: every branch side by side. Pick a branch from the top bar to adjust its stock.</p></div>
+  <div class="row"><a class="btn" href="{% url 'movements' %}">History</a><a class="btn" href="{% url 'transfers' %}">{% icon 'repeat' 16 %} {% tr "Stock Transfers" %}</a></div></div>
+<form method="get" class="filters"><input class="input" name="q" value="{{ q }}" placeholder="{% tr 'Search' %}…">
+  <label class="row"><input class="check" type="checkbox" name="low" value="1" {% if low %}checked{% endif %}> {% tr "Low stock" %} only</label><button class="btn">{% icon 'search' 16 %}</button></form>
+<div class="card tbl-wrap"><table class="tbl">
+  <thead><tr><th>{% tr "Ingredients" %}</th>{% for b in branches %}<th>{{ b.code }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for r in rows %}<tr><td><b>{{ r.ing.name }}</b> <span class="small muted">{{ r.ing.unit }}</span></td>
+    {% for c in r.cells %}<td>{% if c %}<span class="{% if c.is_low %}badge b-red{% endif %}">{{ c.quantity|num }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}</tr>
+  {% empty %}<tr><td colspan="9" class="empty">Nothing to show.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

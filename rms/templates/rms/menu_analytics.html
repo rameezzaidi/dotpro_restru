@@ -1,0 +1,57 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Menu Analytics</h1><p>Cost per item, margin, top sellers and menu engineering · {{ abranch.name }} ({{ abranch.currency_code }})</p></div></div>
+<form method="get" class="filters">
+  {% if picker %}<div><label class="small muted">Branch</label><br><select class="input" name="b" onchange="this.form.submit()">{% for b in picker %}<option value="{{ b.pk }}" {% if b.pk == abranch.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></div>{% endif %}
+  <div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div>
+  <div><label class="small muted">Target food cost %</label><br><input class="input" type="number" name="target" min="5" max="80" value="{{ f.target }}" style="width:90px"></div>
+  <button class="btn">{% icon 'search' 16 %}</button></form>
+
+<div class="stats">
+  <div class="card stat"><div class="lbl">Sales (items)</div><div class="val">{{ tot_rev|money:abranch }}</div></div>
+  <div class="card stat"><div class="lbl">Gross profit</div><div class="val">{{ tot_profit|money:abranch }}</div></div>
+  <div class="card stat"><div class="lbl">Avg food cost</div><div class="val">{% if avg_cost_pct is not None %}{{ avg_cost_pct }}%{% else %}—{% endif %}</div><div class="sub">of menu price</div></div>
+  <div class="card stat"><div class="lbl">Items without recipe</div><div class="val">{{ nocost }}</div></div>
+</div>
+
+<div class="cols eq" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h2>{% icon 'star' 18 %} Top selling items</h2><span class="small muted">by quantity</span></div><div class="card-b">
+    {% for r in by_qty %}<div style="margin:9px 0"><div class="row" style="justify-content:space-between"><span><b>{{ forloop.counter }}.</b> {{ r.name }}</span><b>× {{ r.q }}</b></div><div class="meter"><i style="width:{{ r.qpct }}%"></i></div></div>
+    {% empty %}<div class="muted">No sales in this period.</div>{% endfor %}</div></div>
+  <div class="card"><div class="card-h"><h2>{% icon 'wallet' 18 %} Most profitable items</h2><span class="small muted">after ingredient cost</span></div><div class="card-b">
+    {% for r in by_profit %}<div style="margin:9px 0"><div class="row" style="justify-content:space-between"><span><b>{{ forloop.counter }}.</b> {{ r.name }}</span><b>{{ r.profit|money:abranch }}</b></div><div class="meter"><i style="width:{{ r.ppct }}%"></i></div></div>
+    {% empty %}<div class="muted">Add recipes to see profit.</div>{% endfor %}</div></div>
+</div>
+
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>Cost per item &amp; menu engineering</h2><span class="small muted">click “Recipe” to preview ingredients</span></div>
+<table class="tbl"><thead><tr><th>Item</th><th class="right">Price</th><th class="right">Cost</th><th class="right">Margin</th><th class="right">Food cost %</th><th class="right">Sold</th><th class="right">Customer rating</th><th class="right">Profit</th><th class="right">Price for {{ f.target }}%</th><th>Class</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr>
+<td><b>{{ r.name }}</b><div class="small muted">{{ r.category }} · {{ r.sku }}</div></td>
+<td class="right">{{ r.price|money:abranch }}</td>
+<td class="right">{% if r.cost is not None %}{{ r.cost|money:abranch }}{% else %}<span class="muted">—</span>{% endif %}</td>
+<td class="right">{% if r.margin is not None %}{{ r.margin|money:abranch }}<div class="small muted">{{ r.margin_pct }}%</div>{% else %}—{% endif %}</td>
+<td class="right">{% if r.cost_pct is not None %}<span class="badge {% if r.cost_pct > 40 %}b-red{% elif r.cost_pct > 32 %}b-amber{% else %}b-green{% endif %}">{{ r.cost_pct }}%</span>{% else %}—{% endif %}</td>
+<td class="right">{{ r.q }}</td><td class="right">{% if r.rating %}<span class="badge {% if r.rating >= 4.2 %}b-green{% elif r.rating >= 3.5 %}b-amber{% else %}b-red{% endif %}">{{ r.rating }} ★</span><div class="small muted">{{ r.rating_n }}</div>{% else %}—{% endif %}</td><td class="right">{% if r.profit is not None %}{{ r.profit|money:abranch }}{% else %}—{% endif %}</td>
+<td class="right">{% if r.suggested %}{{ r.suggested|money:abranch }}{% else %}—{% endif %}</td>
+<td><span class="badge {% if r.klass == 'star' %}b-green{% elif r.klass == 'plow' %}b-amber{% elif r.klass == 'puzzle' %}b-blue{% elif r.klass == 'dog' %}b-red{% else %}b-grey{% endif %}">{{ r.klass_label }}</span></td>
+<td class="right">{% if r.preview and r.preview.lines %}<button class="btn sm" type="button" data-prev="{{ r.id }}">Recipe</button>{% else %}<a class="btn sm" href="{% url 'recipe' r.id %}">Add recipe</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="11" class="empty">No items.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>What the classes mean</h2></div><div class="card-b cols eq">
+{% for k, v in classes.items %}<div><b>{{ v.0 }}</b><div class="small muted">{{ v.1 }}</div></div>{% endfor %}</div></div>
+
+<dialog class="dlg" id="prev" style="width:min(680px,96vw)"><h3 id="pv-t"></h3><div id="pv-b" style="overflow-x:auto"></div><div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" type="button" onclick="document.getElementById('prev').close()">Close</button></div></dialog>
+{{ pv|json_script:"pvdata" }}
+<script>
+const PV = JSON.parse(document.getElementById("pvdata").textContent);
+document.querySelectorAll("[data-prev]").forEach(b => b.onclick = () => {
+  const d = PV[b.dataset.prev]; if (!d) return;
+  document.getElementById("pv-t").textContent = d.name + " — recipe";
+  let h = '<p class="small muted">Price ' + d.price + (d.cost_pct ? ' · food cost ' + d.cost_pct + '%' : '') + '</p><table class="tbl"><thead><tr><th>Ingredient</th><th class="right">Qty / portion</th><th class="right">Unit cost</th><th class="right">Cost</th><th></th></tr></thead><tbody>';
+  d.lines.forEach(l => h += '<tr><td>' + l[0] + '</td><td class="right">' + l[1] + '</td><td class="right">' + l[2] + '</td><td class="right">' + l[3] + '</td><td style="width:70px"><div class="meter"><i style="width:' + l[4] + '%"></i></div></td></tr>');
+  h += '<tr><td colspan="3"><b>Total cost per portion</b></td><td class="right"><b>' + d.total + '</b></td><td></td></tr></tbody></table>';
+  document.getElementById("pv-b").innerHTML = h; document.getElementById("prev").showModal();
+});
+</script>
+{% endblock %}

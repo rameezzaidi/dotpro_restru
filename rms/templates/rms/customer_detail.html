@@ -1,0 +1,25 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{{ c.name|default:c.phone }}</h1><p>{{ c.phone }} · <span class="badge {% if c.tier == 'Gold' %}b-amber{% elif c.tier == 'Silver' %}b-grey{% else %}b-brand{% endif %}">{{ c.tier }}</span> · customer since {{ c.created_at|date:"d M Y" }}</p></div><a class="btn" href="{% url 'customers' %}">← All customers</a></div>
+<div class="stats">
+  <div class="card stat"><div class="lbl">Visits</div><div class="val">{{ c.visits }}</div><div class="sub">last {% if c.last_visit %}{{ c.last_visit|date:"d M Y" }}{% else %}—{% endif %}</div></div>
+  <div class="card stat"><div class="lbl">Total spent</div><div class="val">{{ c.total_spent|money:cbranch }}</div><div class="sub">avg {{ avg|money:cbranch }} per visit</div></div>
+  <div class="card stat"><div class="lbl">Loyalty points</div><div class="val">{{ c.points }}</div><div class="sub">worth {{ worth|money:cbranch }} · {{ c.lifetime_points }} earned in total</div></div>
+  <div class="card stat"><div class="lbl">Rates us</div><div class="val">{% if rated.a %}{{ rated.a|floatformat:1 }} ★{% else %}—{% endif %}</div><div class="sub">{% if service_avg %}service {{ service_avg|floatformat:1 }}★ · {% endif %}{{ rated.n }} dish ratings</div></div>
+</div>
+<div class="cols eq" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h2>Profile</h2></div><div class="card-b"><form method="post" action="{% url 'customer_action' c.pk %}">{% csrf_token %}<input type="hidden" name="action" value="save">
+    <label class="small muted">Name</label><input class="input" name="name" value="{{ c.name }}"><label class="small muted">Email</label><input class="input" name="email" value="{{ c.email }}">
+    <label class="small muted">Address</label><input class="input" name="address" value="{{ c.address }}"><label class="small muted">Notes (allergies, preferences)</label><input class="input" name="notes" value="{{ c.notes }}">
+    <button class="btn primary" style="margin-top:10px">Save</button></form></div></div>
+  <div>
+    <div class="card"><div class="card-h"><h2>Favourite items</h2></div><div class="card-b">{% for f in fav %}<div class="row" style="justify-content:space-between;margin:5px 0"><span>{{ f.name }}</span><b>× {{ f.n }}</b></div>{% empty %}<div class="muted">No completed orders yet.</div>{% endfor %}</div></div>
+    {% if user.role != "cashier" %}<div class="card" style="margin-top:16px"><div class="card-h"><h2>Adjust points</h2></div><div class="card-b"><form method="post" action="{% url 'customer_action' c.pk %}" class="row" style="gap:8px;flex-wrap:wrap">{% csrf_token %}<input type="hidden" name="action" value="adjust">
+      <input class="input" type="number" name="points" placeholder="+50 / -20" style="width:110px"><input class="input" name="reason" placeholder="Reason (birthday, complaint…)" style="flex:1;min-width:160px"><button class="btn">Apply</button></form></div></div>{% endif %}
+  </div>
+</div>
+<div class="cols eq" style="margin-top:16px">
+  <div class="card tbl-wrap"><div class="card-h"><h2>Orders</h2></div><table class="tbl"><tbody>{% for o in orders %}<tr><td><a href="{% url 'order_detail' o.pk %}">{{ o.number }}</a><div class="small muted">{{ o.created_at|date:"d M Y, H:i" }} · {{ o.get_order_type_display }}</div></td><td>{% status_badge o %}</td><td class="right">{{ o.total|money:o.branch }}</td></tr>{% empty %}<tr><td class="empty">No orders.</td></tr>{% endfor %}</tbody></table></div>
+  <div class="card tbl-wrap"><div class="card-h"><h2>Points history</h2></div><table class="tbl"><tbody>{% for t in ledger %}<tr><td class="small">{{ t.created_at|date:"d M Y" }}<div class="muted">{{ t.reason }}</div></td><td class="right"><b style="color:{% if t.points > 0 %}var(--green){% else %}var(--red){% endif %}">{{ t.points|stringformat:"+d" }}</b></td></tr>{% empty %}<tr><td class="empty">No points yet.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+{% endblock %}

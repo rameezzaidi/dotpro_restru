@@ -1,0 +1,38 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Orders" %}</h1></div>
+  {% if request.branch %}<a class="btn primary" href="{% url 'pos' %}">{% icon 'plus' 16 %} {% tr "POS" %}</a>{% endif %}</div>
+<form method="get" class="filters">
+  <div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div>
+  <div><label class="small muted">{% tr "Status" %}</label><br><select class="input" name="status"><option value="">All</option><option value="active" {% if f.status == 'active' %}selected{% endif %}>Open</option>
+    {% for v, l in statuses %}<option value="{{ v }}" {% if f.status == v %}selected{% endif %}>{{ l|t:lang }}</option>{% endfor %}</select></div>
+  <div><label class="small muted">{% tr "Type" %}</label><br><select class="input" name="type"><option value="">All</option>
+    {% for v, l in types %}<option value="{{ v }}" {% if f.type == v %}selected{% endif %}>{{ l|t:lang }}</option>{% endfor %}</select></div>
+  <div><label class="small muted">{% tr "Source" %}</label><br><select class="input" name="source"><option value="">All</option>
+    {% for c in channels %}<option value="{{ c.id }}" {% if f.source == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div><label class="small muted">{% tr "Search" %}</label><br><input class="input" name="q" value="{{ f.q }}" placeholder="No. / phone / name"></div>
+  <button class="btn">{% icon 'search' 16 %}</button>
+</form>
+<div class="card tbl-wrap">
+  <table class="tbl" data-server="1"><thead><tr><th>#</th>{% if branch_all %}<th>{% tr "Branches" %}</th>{% endif %}<th>{% tr "Type" %}</th><th>{% tr "Source" %}</th><th>{% tr "Status" %}</th><th>{% tr "Paid" %}</th><th class="right" data-sum>{% tr "Total" %}</th><th>{% tr "Date" %}</th></tr></thead>
+  <tbody>
+  {% for o in page %}
+    <tr>
+      <td><a href="{% url 'order_detail' o.pk %}"><b>{{ o.number }}</b></a>{% if o.table %}<div class="small muted">{{ o.table.name }}</div>{% endif %}</td>
+      {% if branch_all %}<td>{{ o.branch.code }}</td>{% endif %}
+      <td>{{ o.get_order_type_display|t:lang }}</td><td>{{ o.source.name|default:"—" }}</td>
+      <td>{% status_badge o %}</td>
+      <td>{% if o.is_paid %}<span class="badge b-green">{{ "Paid"|t:lang }}</span>{% elif o.paid_total > 0 %}<span class="badge b-blue">Partial</span>{% else %}<span class="badge b-amber">{{ "Unpaid"|t:lang }}</span>{% endif %}</td>
+      <td class="right">{{ o.total|money:o.branch }}</td>
+      <td class="small muted nowrap">{{ o.created_at|date:"d M, H:i" }}</td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="empty">No orders match these filters.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% if page.has_other_pages %}<div class="row" style="margin-top:14px">
+  {% if page.has_previous %}<a class="btn sm" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">← Prev</a>{% endif %}
+  <span class="muted small">Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn sm" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">Next →</a>{% endif %}
+</div>{% endif %}
+{% endblock %}

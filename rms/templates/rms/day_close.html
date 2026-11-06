@@ -1,0 +1,36 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Day close — {{ today|date:"d M Y" }}</h1><p>{{ branch.name }} · end-of-day summary. Closing blocks new orders until you reopen the day.</p></div>
+  <div class="row no-print"><button class="btn" onclick="window.print()">{% icon 'print' 16 %} Print</button></div></div>
+{% if closed %}<div class="msg success" style="margin-bottom:14px">Day closed by {{ closed.closed_by.display_name|default:"—" }} at {{ closed.closed_at|date:"H:i" }}.
+  <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="reopen"><input type="hidden" name="id" value="{{ closed.pk }}"><button class="btn sm">Reopen day</button></form></div>{% endif %}
+<div class="stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px">
+  <div class="card"><div class="card-b"><div class="muted small">Bills</div><div style="font-size:26px;font-weight:800">{{ s.orders }}</div></div></div>
+  <div class="card"><div class="card-b"><div class="muted small">Net sales</div><div style="font-size:26px;font-weight:800">{{ s.sales|money:branch }}</div></div></div>
+  <div class="card"><div class="card-b"><div class="muted small">Tax / service</div><div style="font-size:20px;font-weight:700">{{ s.tax|money:branch }} / {{ s.service|money:branch }}</div></div></div>
+  <div class="card"><div class="card-b"><div class="muted small">Tips</div><div style="font-size:26px;font-weight:800">{{ s.tips|money:branch }}</div></div></div>
+  <div class="card"><div class="card-b"><div class="muted small">Voids &amp; cancels</div><div style="font-size:26px;font-weight:800">{{ s.void_count }}</div><div class="small muted">{{ s.void_amount|money:branch }}</div></div></div>
+</div>
+<div class="cols">
+  <div class="card"><div class="card-h"><h2>Collected by method</h2></div><div class="card-b">
+    {% for m, v in s.by_method.items %}<div class="row" style="justify-content:space-between;margin:6px 0"><span>{{ m|title }}</span><b>{{ v|money:branch }}</b></div>{% empty %}<div class="muted">No payments today.</div>{% endfor %}</div></div>
+  <div class="card"><div class="card-h"><h2>Sales by order type</h2></div><div class="card-b">
+    {% for k, v in s.by_type.items %}<div class="row" style="justify-content:space-between;margin:6px 0"><span>{{ k|title }}</span><span>{{ v.0 }} bills · <b>{{ v.1|money:branch }}</b></span></div>{% empty %}<div class="muted">No sales today.</div>{% endfor %}</div></div>
+</div>
+{% if not closed %}
+<div class="card" style="margin-top:16px"><div class="card-b">
+  {% if s.open_orders or s.open_shifts %}
+    <b style="color:var(--amber)">Before closing the day:</b>
+    <ul class="small">{% if s.open_orders %}<li>{{ s.open_orders }} open order(s):
+      {% for o in open_orders %}<a href="{% url 'order_detail' o.pk %}">{{ o.number }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</li>{% endif %}
+      {% if s.open_shifts %}<li>{{ s.open_shifts }} open cashier shift(s): {% for sh in open_shifts %}{{ sh.user.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %} — <a href="{% url 'shifts' %}">close them</a></li>{% endif %}</ul>
+  {% endif %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="close">
+    <button class="btn primary" {% if s.open_orders or s.open_shifts %}disabled{% endif %} data-confirm="Close the business day? New orders will be blocked.">{% icon 'check' 16 %} Close business day</button></form>
+</div></div>{% endif %}
+<h3 style="margin:20px 0 8px">Previous days</h3>
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Bills</th><th class="right">Sales</th><th>Closed by</th><th></th></tr></thead><tbody>
+{% for h in history %}<tr><td>{{ h.date|date:"d M Y" }}</td><td>{{ h.summary.orders }}</td><td class="right">{{ h.summary.sales }}</td><td>{{ h.closed_by.display_name|default:"—" }}</td>
+  <td class="right">{% if h.date == today %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reopen"><input type="hidden" name="id" value="{{ h.pk }}"><button class="btn sm">Reopen</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="5" class="empty">No closed days yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

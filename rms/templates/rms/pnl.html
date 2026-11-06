@@ -1,0 +1,18 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Profit & Loss" %}</h1><p>{{ d1 }} → {{ d2 }} · {{ p.days }} {% tr "days" %}</p></div>
+  <form method="get" class="row"><input class="input" type="date" name="from" value="{{ d1|date:'Y-m-d' }}"><input class="input" type="date" name="to" value="{{ d2|date:'Y-m-d' }}"><button class="btn primary">{% tr "Show" %}</button></form></div>
+{% if mixed %}<div class="card" style="padding:10px 14px;margin-bottom:12px">Branches use different currencies — pick one branch for exact figures.</div>{% endif %}
+<div class="card tbl-wrap"><table class="tbl" data-nosearch>
+<tbody>
+<tr><td><b>{% tr "Sales (without tax)" %}</b> <span class="muted">({{ p.orders }} {% tr "completed orders" %})</span></td><td class="right"><b>{{ p.revenue|money }}</b></td></tr>
+<tr><td>&nbsp;&nbsp;{% tr "Discounts given" %} <span class="muted">(already deducted)</span></td><td class="right">{{ p.discounts|money }}</td></tr>
+<tr><td>− {% tr "Food cost (ingredients)" %}</td><td class="right">{{ p.cogs|money }}</td></tr>
+<tr><td><b>{% tr "Gross profit" %}</b> <span class="muted">{{ p.gross_pct|floatformat:1 }}%</span></td><td class="right"><b>{{ p.gross|money }}</b></td></tr>
+{% for c in p.by_cat %}<tr><td>− {{ c.label }}</td><td class="right">{{ c.amount|money }}</td></tr>{% endfor %}
+<tr><td>− {% tr "Expenses total" %}</td><td class="right">{{ p.expenses|money }}</td></tr>
+<tr><td>− {% tr "Salaries" %} <span class="muted">(monthly salaries × {{ p.days }}/30)</span></td><td class="right">{{ p.salaries|money }}</td></tr>
+<tr><td><b>{% tr "Net profit" %}</b> <span class="muted">{{ p.net_pct|floatformat:1 }}%</span></td><td class="right"><b style="color:{% if p.net < 0 %}#c0392b{% else %}#1e8e4e{% endif %}">{{ p.net|money }}</b></td></tr>
+</tbody></table></div>
+<p class="muted" style="margin-top:10px">Food cost uses recipe costs. Salaries are the active staff and rider monthly salaries, pro-rated for the days shown. <a href="{% url 'expenses' %}">Add expenses</a>.</p>
+{% endblock %}

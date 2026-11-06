@@ -1,0 +1,11 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sandbox gateway</title><link rel="stylesheet" href="{% static 'rms/app.css' %}"></head>
+<body><div style="max-width:420px;margin:26px auto;padding:0 14px"><div class="card"><div class="card-b">
+  <span class="badge b-amber">SANDBOX · TEST MODE</span>
+  <h2 style="margin:10px 0 2px">Pay {{ link.amount|money:o.branch }}</h2><p class="muted small">Order {{ o.number }} · {{ o.branch.name }}</p>
+  <form method="post">{% csrf_token %}
+    <label class="small muted">Card number</label><input class="input" value="4242 4242 4242 4242" readonly>
+    <div class="row" style="gap:8px"><div style="flex:1"><label class="small muted">Expiry</label><input class="input" value="12 / 30" readonly></div><div style="flex:1"><label class="small muted">CVC</label><input class="input" value="123" readonly></div></div>
+    <button class="btn primary" name="outcome" value="success" style="width:100%;margin-top:12px;min-height:46px">Pay (simulate success)</button>
+    <button class="btn" name="outcome" value="fail" style="width:100%;margin-top:8px">Simulate failure</button>
+  </form></div></div></div></body></html>

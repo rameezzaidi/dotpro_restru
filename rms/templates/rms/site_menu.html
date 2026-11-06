@@ -1,0 +1,108 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="{{ lang }}" dir="{{ lang_dir }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#faf6ef">
+<title>{{ b.name }} · Order online</title><link rel="stylesheet" href="{% static 'rms/site.css' %}"></head>
+<body class="site">{% csrf_token %}
+<header class="sx-hero"><span class="sx-brand"><span class="logo">{% icon 'store' 16 %}</span>{{ setting.business_name }}</span>
+  <h1>{{ b.name }}</h1><p>Handcrafted dishes, made to order and delivered hot.</p>
+  <div class="sx-meta">{% if b.address %}<span class="sx-chip">{% icon 'map' 14 %}{{ b.address }}</span>{% endif %}{% if b.phone %}<span class="sx-chip">{% icon 'phone' 14 %}{{ b.phone }}</span>{% endif %}<span class="sx-chip">{% icon 'truck' 14 %}Delivery {{ b.currency_symbol }} {{ b.delivery_fee }}</span></div></header>
+<div class="sx-wrap">
+  <div>
+    <div class="ai-order" style="padding:0 2px"><input id="ai-text" class="input" placeholder="✨ Type your order: &quot;2 zinger burger aur 1 coke&quot;"><button type="button" class="btn" id="ai-go">Add</button></div>
+    <div class="ai-line" id="ai-out"></div>
+    <div class="sx-bar"><label class="sx-search">{% icon 'search' 16 %}<input id="q" placeholder="Search dishes..." autocomplete="off"></label>
+      <div class="cats" id="cats"><button class="cat active" data-cat="0">All</button>{% for c in categories %}<button class="cat" data-cat="{{ c.id }}">{{ c.name }}</button>{% endfor %}</div></div>
+    <div class="items" id="items"></div>
+  </div>
+  <aside class="sx-cart" id="cart">
+    <div class="sx-cart-h"><h2>Your order</h2><span class="n" id="cnt">0 items</span><button class="sx-x" id="xcart" type="button" aria-label="Close">×</button></div>
+    <div class="sx-lines cart-lines" id="lines"><div class="empty">Your cart is empty</div></div>
+    <div class="ai-strip" id="ai-strip"></div>
+    <div class="sx-opts">
+      <div class="seg"><button type="button" data-type="delivery" class="on">Delivery</button><button type="button" data-type="takeaway">Takeaway</button></div>
+      <input class="input" id="name" placeholder="Your name"><input class="input" id="phone" placeholder="Phone *" inputmode="tel">
+      <input class="input" id="addr" placeholder="Delivery address *"><input class="input" id="notes" placeholder="Notes for the kitchen (optional)">
+    </div>
+    <div class="sx-tot">
+      <div class="t"><span>Subtotal</span><span id="t-sub">0</span></div>
+      <div class="t"><span><input class="input" id="coupon" placeholder="Promo code" style="width:130px;text-transform:uppercase"> <button type="button" class="btn sm" id="coupon-go">Apply</button></span><span id="coupon-msg" class="small"></span></div>
+      <div class="t hidden" id="r-disc"><span>Discount</span><span id="t-disc">0</span></div>
+      <div class="t" id="r-fee"><span>Delivery fee</span><span id="t-fee">0</span></div>
+      <div class="t grand"><span>Total</span><span id="t-total">0</span></div>
+      <p class="sx-note">Tax is added at checkout. Pay on delivery / pickup.</p>
+      <button class="sx-btn" id="go">Place order {% icon 'arrow' 16 %}</button>
+    </div>
+  </aside>
+</div>
+<button class="sx-fab zero" id="fab" type="button"><span id="fab-n">0 items</span><span>View order · <b id="fab-t"></b></span></button>
+<div class="sx-toast" id="toast"></div>
+{{ menu|json_script:"menu-data" }}
+<script src="{% static 'rms/app.js' %}"></script>
+<script src="{% static 'rms/mods.js' %}"></script>
+<script src="{% static 'rms/ai.js' %}"></script>
+<script>
+(function () {
+  var MENU = JSON.parse(document.getElementById("menu-data").textContent), cart = {}, type = "delivery", cat = 0;
+  var SYM = "{{ b.currency_symbol|escapejs }}", FEE = {{ b.delivery_fee }}, $ = function (i) { return document.getElementById(i); };
+  var csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  var fmt = function (n) { return SYM + " " + n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); };
+  function items() {
+    var h = ""; MENU.forEach(function (m) { if (cat && m.category !== cat) return; if (q && (m.name + " " + (m.desc || "")).toLowerCase().indexOf(q) < 0) return; h += tileHTML(m, fmt(m.price), cartQty(cart, m.id)); });
+    $("items").innerHTML = h || '<div class="sx-empty">No dishes match your search.</div>';
+  }
+  var couponAmt = 0;
+  function render() {
+    var h = "", sub = 0;
+    Object.values(cart).forEach(function (l) { sub += l.price * l.qty;
+      h += '<div class="cl"><div><b>' + esc(l.name) + '</b></div><div class="qty"><button data-dec="' + l.id + '">−</button><span>' + l.qty + '</span><button data-inc="' + l.id + '">+</button></div><b>' + fmt(l.price * l.qty) + '</b></div>'; });
+    $("lines").innerHTML = h || '<div class="empty">Cart is empty</div>';
+    var fee = type === "delivery" ? FEE : 0, dc = Math.min(couponAmt, sub); $("t-sub").textContent = fmt(sub); $("t-fee").textContent = fmt(fee); $("t-total").textContent = fmt(sub - dc + fee);
+    $("r-disc").classList.toggle("hidden", !dc); $("t-disc").textContent = "−" + fmt(dc);
+    $("r-fee").classList.toggle("hidden", type !== "delivery"); $("addr").classList.toggle("hidden", type !== "delivery");
+    tileBadges(cart);
+    var n = Object.values(cart).reduce(function (a, l) { return a + l.qty; }, 0), tot = sub - dc + fee;
+    $("cnt").textContent = n + (n === 1 ? " item" : " items"); $("fab").classList.toggle("zero", !n);
+    $("fab-n").textContent = n + (n === 1 ? " item" : " items"); $("fab-t").textContent = fmt(tot);
+    if (window.AIUP) AIUP.refresh();
+  }
+  $("coupon-go").addEventListener("click", function () {
+    var its = cartItems(cart);
+    if (!its.length) { toast("Add items first"); return; }
+    fetch("{% url 'site_coupon' b.code %}", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify({items: its, code: $("coupon").value})})
+      .then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) { couponAmt = 0; $("coupon-msg").textContent = d.error; render(); return; }
+        couponAmt = d.amount; $("coupon-msg").textContent = "Code " + d.code + " applied"; render(); });
+  });
+  $("coupon").addEventListener("input", function () { couponAmt = 0; $("coupon-msg").textContent = ""; render(); });
+  function toast(m) { var t = $("toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2600); }
+  var q = "";
+  $("q").addEventListener("input", function () { q = this.value.trim().toLowerCase(); items(); });
+  $("fab").addEventListener("click", function () { $("cart").classList.add("open"); });
+  $("xcart").addEventListener("click", function () { $("cart").classList.remove("open"); });
+  $("items").addEventListener("click", function (e) { var b = e.target.closest(".tile"); if (!b) return; if (b.dataset.out) return; var m = MENU.find(function (x) { return x.id == b.dataset.id; });
+    if (m.mods && m.mods.length) { askMods(m, fmt, function (sel) { cartAdd(cart, m, sel, 1); render(); toast("Added " + m.name); }); return; }
+    cartAdd(cart, m, null, 1); render(); toast("Added " + m.name); });
+  $("lines").addEventListener("click", function (e) { var i = e.target.closest("[data-inc]"), d = e.target.closest("[data-dec]");
+    if (i) cart[i.dataset.inc].qty++; if (d) { cart[d.dataset.dec].qty--; if (cart[d.dataset.dec].qty <= 0) delete cart[d.dataset.dec]; } render(); });
+  $("cats").addEventListener("click", function (e) { var b = e.target.closest(".cat"); if (!b) return;
+    document.querySelectorAll(".cat").forEach(function (x) { x.classList.remove("active"); }); b.classList.add("active"); cat = parseInt(b.dataset.cat); items(); });
+  document.querySelectorAll(".seg button").forEach(function (b) { b.addEventListener("click", function () {
+    type = b.dataset.type; document.querySelectorAll(".seg button").forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
+  $("go").addEventListener("click", function () {
+    var its = cartItems(cart);
+    if (!its.length) { toast("Please add items first"); return; }
+    $("go").disabled = true;
+    fetch("{% url 'site_submit' b.code %}", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
+      body: JSON.stringify({items: its, order_type: type, name: $("name").value, phone: $("phone").value, address: $("addr").value, notes: $("notes").value, coupon: $("coupon").value})})
+      .then(function (r) { return r.json(); }).then(function (d) { $("go").disabled = false; if (!d.ok) { toast(d.error); return; } window.location = d.track; })
+      .catch(function () { $("go").disabled = false; toast("Network error"); });
+  });
+  function addById(id, qty) { var m = MENU.find(function (x) { return x.id == id; }); if (!m || m.max_qty === 0) return;
+    if (m.mods && m.mods.length) { askMods(m, fmt, function (sel) { cartAdd(cart, m, sel, 1); render(); toast("Added " + m.name); }); return; }
+    cartAdd(cart, m, null, qty || 1); render(); toast("Added " + m.name); }
+  RestoAI.order({input: "ai-text", button: "ai-go", output: "ai-out", url: "{% url 'site_ai_order' b.code %}", csrf: function () { return csrf; }, add: function (l) { addById(l.id, l.qty); }});
+  window.AIUP = RestoAI.upsell({strip: "ai-strip", url: "{% url 'site_upsell' b.code %}", ids: function () { return Object.values(cart).map(function (l) { return l.mid; }); }, add: function (id) { addById(id, 1); }, fmt: fmt});
+  items(); render();
+})();
+</script>
+</body></html>

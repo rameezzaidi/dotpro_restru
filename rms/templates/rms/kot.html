@@ -1,0 +1,24 @@
+{% load rms_tags static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>KOT {{ o.number }}</title>
+<link rel="stylesheet" href="{% static 'rms/app.css' %}">
+<style>.kot{max-width:320px;margin:16px auto;background:#fff;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+.kot h1{font-size:22px;text-align:center;margin:0}.kot .big{font-size:18px;font-weight:800}.kot hr{border:0;border-top:2px dashed #333;margin:8px 0}
+.kot li{list-style:none;margin:8px 0;font-size:18px;font-weight:700}.kot li small{display:block;font-size:13px;font-weight:400}
+.kot .r{display:flex;justify-content:space-between}</style></head>
+<body style="background:#f4f4f4">
+<div class="kot">
+  <h1>KITCHEN ORDER</h1>
+  <div style="text-align:center">{{ o.branch.name }}</div><hr>
+  <div class="r"><span class="big">{{ o.get_order_type_display|upper }}</span><span class="big">{% if o.table %}TABLE {{ o.table.name }}{% endif %}</span></div>
+  <div class="r"><span>Order</span><b>{{ o.number }}</b></div>
+  <div class="r"><span>KOT round</span><b>#{{ round }}{% if round > 1 %} (ADD-ON){% endif %}</b></div>
+  <div class="r"><span>Time</span><span>{% now "d/m/Y H:i" %}</span></div>
+  {% if o.waiter %}<div class="r"><span>Waiter</span><span>{{ o.waiter.display_name }}</span></div>{% endif %}
+  <hr>
+  <ul style="padding:0;margin:0">{% for l in lines %}<li {% if l.is_void %}style="text-decoration:line-through"{% endif %}>{{ l.qty }} × {{ l.name }}{% if l.is_void %} (VOID){% endif %}{% if l.notes %}<small>» {{ l.notes }}</small>{% endif %}</li>{% endfor %}</ul>
+  {% if o.notes %}<hr><div><b>NOTE:</b> {{ o.notes }}</div>{% endif %}
+  <hr><div style="text-align:center">— end of ticket —</div>
+  <p class="no-print" style="text-align:center"><button onclick="window.print()" class="btn">Print</button></p>
+</div>
+<script>window.addEventListener("load", function(){ if (location.search.indexOf("print=1") > -1) window.print(); });</script>
+</body></html>

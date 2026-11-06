@@ -1,0 +1,9 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Salary slips - {{ month|date:"F Y" }}</h1><p>Monthly salary + commission + delivery pay + tips for waiters and riders. Prepared automatically on the 1st; staff with a phone number get their slip as a message.</p></div>
+  <form method="get"><input class="input" type="month" name="month" value="{{ month_str }}" onchange="this.form.submit()"></form></div>
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Staff</th><th>Role</th><th>Branches</th><th data-sum>Orders</th><th data-sum>Salary</th><th data-sum>Commission</th><th data-sum>Delivery pay</th><th data-sum>Tips</th><th data-sum>Total</th><th></th></tr></thead><tbody>
+{% for d in rows %}<tr><td><b>{{ d.label }}</b></td><td>{{ d.kind|title }}</td><td>{{ d.branch.code }}</td><td>{{ d.orders }}</td><td>{{ d.salary|num }}</td><td>{{ d.commission|num }}</td><td>{{ d.delivery_pay|num }}</td><td>{{ d.tips|num }}</td><td><b>{{ d.total|num }}</b></td>
+ <td class="right"><a class="btn sm" href="{% url 'slip' d.kind d.p.pk %}?month={{ month_str }}" target="_blank">Slip</a></td></tr>
+{% empty %}<tr><td colspan="10" class="empty">No waiters or riders.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>AI Centre</h1><p>Copilot, AI order taking, upsell, menu advisor, reply drafts, prep plan and anomaly watch · {{ abranch.name }}</p></div></div>
+{% if picker %}<form method="get" class="filters"><div><label class="small muted">Branch</label><br><select class="input" name="b" onchange="this.form.submit()">{% for b in picker %}<option value="{{ b.pk }}" {% if b.pk == abranch.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></div></form>{% endif %}
+
+<div class="stats">
+  <div class="card stat"><div class="lbl">Claude</div><div class="val">{% if has_key and st.ai_enabled %}Connected{% elif has_key %}Paused{% else %}Not set{% endif %}</div>
+    <div class="sub">{% if has_key %}model {{ model }}{% else %}add ANTHROPIC_API_KEY - rule-based AI works meanwhile{% endif %}</div></div>
+  <div class="card stat"><div class="lbl">AI calls (30 days)</div><div class="val">{{ usage.total }}</div><div class="sub">{{ usage.llm }} answered by Claude · {{ usage.failed }} failed</div></div>
+  <div class="card stat"><div class="lbl">Ask anywhere</div><div class="val">✨ Ask AI</div><div class="sub">button at bottom-right of every manager page</div></div>
+</div>
+
+<div class="cols eq" style="margin-top:16px">
+<div class="card"><div class="card-h"><h2>{% icon 'sliders' 18 %} AI settings</h2></div><div class="card-b">
+  <form method="post" action="{% url 'ai_settings' %}">{% csrf_token %}
+    <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" name="ai_enabled" {% if st.ai_enabled %}checked{% endif %}> Use Claude when a key is set <span class="small muted">(off = always rule-based)</span></label>
+    <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" name="ai_upsell" {% if st.ai_upsell %}checked{% endif %}> Upsell suggestions in POS and on the website</label>
+    <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" name="ai_anomaly" {% if st.ai_anomaly %}checked{% endif %}> Anomaly watch (unusual voids, discounts, sales drop, stock write-offs)</label>
+    <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" name="ai_whatsapp" {% if st.ai_whatsapp %}checked{% endif %}> WhatsApp ordering (customer sends a message, AI builds the order)</label>
+    <div class="small muted" style="margin-bottom:4px">WhatsApp orders go to branch</div>
+    <select class="input" name="ai_wa_branch" style="margin-bottom:12px"><option value="">First online-ordering branch</option>{% for b in all_branches %}<option value="{{ b.pk }}" {% if st.ai_wa_branch_id == b.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select><br>
+    <button class="btn primary">Save</button>
+  </form>
+  <div class="small muted" style="margin-top:12px">Twilio WhatsApp webhook URL (When a message comes in, method POST):<br><code>{{ wa_url }}{% if wa_key %}?key=YOUR_WHATSAPP_WEBHOOK_KEY{% endif %}</code></div>
+</div></div>
+
+<div class="card tbl-wrap"><div class="card-h"><h2>{% icon 'flame' 18 %} Usage by feature</h2></div>
+<table class="tbl" data-plain><thead><tr><th>Feature</th><th class="right">Calls</th><th class="right">By Claude</th><th class="right">Avg ms</th></tr></thead><tbody>
+{% for r in usage.rows %}<tr><td>{{ r.kind }}</td><td class="right">{{ r.n }}</td><td class="right">{{ r.llm|default:0 }}</td><td class="right">{{ r.avg|floatformat:0 }}</td></tr>{% empty %}<tr><td colspan="4" class="empty">No AI calls yet.</td></tr>{% endfor %}</tbody></table>
+{% if usage.recent_errors %}<div class="card-b small" style="color:#c0392b">Latest errors: {{ usage.recent_errors|join:" | " }}</div>{% endif %}</div>
+</div>
+
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>{% icon 'trend' 18 %} Menu advisor</h2>
+  <a class="btn sm" href="?{% if picker %}b={{ abranch.pk }}&{% endif %}summary=1">Explain in Roman Urdu</a></div>
+{% if advice_text %}<div class="card-b ai-box">{{ advice_text }}</div>{% endif %}
+<table class="tbl" data-plain><thead><tr><th>Dish</th><th class="right">Price</th><th class="right">Sold (30d)</th><th class="right">Margin</th><th>Advice</th><th></th></tr></thead><tbody>
+{% for a in advice %}<tr><td><b>{{ a.name }}</b></td><td class="right">{{ a.price|money:abranch }}</td><td class="right">{{ a.qty }}</td><td class="right">{% if a.margin_pct is not None %}{{ a.margin_pct }}%{% else %}-{% endif %}</td>
+<td><span class="badge {% if a.type == 'raise' %}b-green{% elif a.type == 'promote' %}b-amber{% else %}b-red{% endif %}">{{ a.label }}</span> <span class="small muted">{{ a.why }}</span></td>
+<td class="right">{% if a.type == 'raise' %}<form method="post" action="{% url 'ai_apply_price' %}{% if picker %}?b={{ abranch.pk }}{% endif %}" style="display:inline">{% csrf_token %}<input type="hidden" name="item" value="{{ a.id }}"><input type="hidden" name="price" value="{{ a.new_price }}"><button class="btn sm">Set {{ a.new_price|floatformat:0 }}</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="6" class="empty">Nothing to flag - need a few weeks of sales and recipes.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="cols eq" style="margin-top:16px">
+<div class="card"><div class="card-h"><h2>{% icon 'file' 18 %} Tomorrow's prep plan</h2>
+  <a class="btn sm" href="?{% if picker %}b={{ abranch.pk }}&{% endif %}prep=1">Generate</a></div><div class="card-b">
+{% if prep %}{% if prep.items %}
+  <div class="small muted">Expected sales {{ prep.tomorrow|floatformat:0 }}{% if prep.busy %} · busy hours {{ prep.busy|join:", " }}{% endif %}</div>
+  {% if prep.text %}<div class="ai-box" style="margin:8px 0">{{ prep.text }}</div>{% endif %}
+  <b>Prep portions</b><div class="small">{% for i in prep.items %}{{ i.name }} × {{ i.portions }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>
+  {% if prep.buy %}<b style="display:block;margin-top:8px">Buy today</b><div class="small">{% for i in prep.buy %}{{ i.name }} {{ i.short }} {{ i.unit }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+{% else %}<div class="muted">Not enough sales history yet.</div>{% endif %}
+{% else %}<div class="muted">Click Generate for tomorrow's prep list, shopping needs and busy hours.</div>{% endif %}</div></div>
+
+<div class="card"><div class="card-h"><h2>{% icon 'star' 18 %} Reply to unhappy customers</h2>
+  <a class="btn sm" href="?{% if picker %}b={{ abranch.pk }}&{% endif %}replies=1">Draft replies</a></div><div class="card-b">
+{% if replies is not None %}{% for r in replies %}
+  <div style="border-bottom:1px solid var(--line);padding:8px 0"><div class="small"><b>{{ r.name }}</b> · {{ r.order }} · {{ r.rating }}/5 <span class="ai-tag {{ r.engine }}">{{ r.engine }}</span>{% if r.poor_items %} · poor: {{ r.poor_items|join:", " }}{% endif %}</div>
+  {% if r.comment %}<div class="small muted">"{{ r.comment }}"</div>{% endif %}
+  <textarea class="input" rows="5" style="width:100%;margin-top:6px" id="rp{{ r.id }}">{{ r.draft }}</textarea>
+  <button class="btn sm" type="button" data-send="{{ r.id }}" style="margin-top:6px">Send to customer</button> <span class="small muted" id="rs{{ r.id }}"></span></div>
+{% empty %}<div class="muted">No unhappy customers with a phone number in the last 14 days.</div>{% endfor %}
+{% else %}<div class="muted">Drafts a polite apology (Roman Urdu) for every low rating, ready to send.</div>{% endif %}</div></div>
+</div>
+
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>Recent AI calls</h2></div>
+<table class="tbl" data-plain><thead><tr><th>When</th><th>Feature</th><th>Answered by</th><th class="right">ms</th></tr></thead><tbody>
+{% for l in recent %}<tr><td>{{ l.created_at|date:"d M H:i:s" }}</td><td>{{ l.kind }}</td><td>{% if l.used_llm %}<span class="ai-tag claude">Claude{% if not l.ok %} (failed){% endif %}</span>{% else %}<span class="ai-tag">rules</span>{% endif %}</td><td class="right">{{ l.ms }}</td></tr>{% empty %}<tr><td colspan="4" class="empty">Nothing yet.</td></tr>{% endfor %}</tbody></table></div>
+<script>
+document.querySelectorAll("[data-send]").forEach(function (b) { b.onclick = function () {
+  var id = b.dataset.send, fd = new FormData(); fd.append("fb", id); fd.append("text", document.getElementById("rp" + id).value);
+  fd.append("csrfmiddlewaretoken", "{{ csrf_token }}"); b.disabled = true;
+  fetch("{% url 'ai_send_reply' %}{% if picker %}?b={{ abranch.pk }}{% endif %}", {method: "POST", body: fd}).then(function (r) { return r.json(); })
+    .then(function (d) { document.getElementById("rs" + id).textContent = d.ok ? "Sent (" + (d.status || "ok") + ")" : (d.error || "Failed"); }).catch(function () { b.disabled = false; });
+}; });
+</script>
+{% endblock %}

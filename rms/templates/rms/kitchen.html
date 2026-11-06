@@ -1,0 +1,106 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% tr "Kitchen" %}</h1>
+    <p>Orders go to a free chef automatically · max per chef is set per branch · extra orders wait in the queue and move in as soon as a slot frees up</p></div>
+  <span class="pill-btn" style="cursor:default"><span class="dot occupied"></span> Live · {{ total_active }} in kitchen</span>
+</div>
+
+<div id="board" data-count="{{ total_active }}">
+{% if stats %}<div class="kstats">{% for r in stats %}<div class="kstat"><div class="kn">{% icon 'user' 15 %} {{ r.chef.display_name }}</div>
+  <div class="kv"><b>{{ r.done }}</b><span>done today</span></div>
+  <div class="kv"><b>{% if r.avg_min %}{{ r.avg_min }}m{% else %}—{% endif %}</b><span>avg cook time</span></div>
+  <div class="kv"><b>{{ r.cooking }}</b><span>cooking now</span></div>
+  <div class="kv"><b>{{ r.total }}</b><span>all-time</span></div></div>{% endfor %}</div>{% endif %}
+<div class="kitchen-grid">
+  {% for col in columns %}
+  <section class="kcol preparing">
+    <h2><span>{% icon 'flame' 18 %} {{ col.chef.display_name }}{% if branch_all %} <span class="small muted">· {{ col.chef.branch.code }}</span>{% endif %}</span>
+      <span class="badge {% if col.orders|length >= col.cap %}b-red{% else %}b-amber{% endif %}">{{ col.orders|length }} / {{ col.cap }}</span></h2>
+    <div class="meter" style="margin-bottom:12px"><i style="width:{% widthratio col.orders|length col.cap 100 %}%"></i></div>
+    {% for o in col.orders %}{% include "rms/_kcard.html" with o=o mode="cook" %}
+    {% empty %}<div class="kfree">Free — waiting for the next order</div>{% endfor %}
+  </section>
+  {% endfor %}
+
+  {% if unassigned %}
+  <section class="kcol preparing"><h2><span>{% icon 'flame' 18 %} Kitchen</span><span class="badge b-amber">{{ unassigned|length }}</span></h2>
+    {% for o in unassigned %}{% include "rms/_kcard.html" with o=o mode="cook" %}{% endfor %}</section>
+  {% endif %}
+
+  <section class="kcol queue">
+    <h2><span>{% icon 'clock' 18 %} Queue</span><span class="badge b-blue">{{ queue|length }}</span></h2>
+    {% for o in queue %}{% include "rms/_kcard.html" with o=o mode="queue" %}
+    {% empty %}<div class="kfree">No orders waiting</div>{% endfor %}
+  </section>
+
+  <section class="kcol ready">
+    <h2><span>{% icon 'check' 18 %} {% tr "Ready" %}</span><span class="badge b-green">{{ ready|length }}</span></h2>
+    {% for o in ready %}{% include "rms/_kcard.html" with o=o mode="ready" %}
+    {% empty %}<div class="kfree">Nothing waiting for pickup</div>{% endfor %}
+  </section>
+</div>
+</div>
+{% if kb %}
+<div class="card" style="margin-top:18px" id="kstock"><div class="card-h"><h2>Stock in {{ kb.name }}</h2>
+  <span class="small muted">{% if stock_low %}<span class="badge b-red">{{ stock_low }} low / out</span>{% else %}<span class="badge b-green">All good</span>{% endif %} · lowest first · <a href="{% url 'stock' %}">full stock →</a></span></div>
+  <div class="tbl-wrap"><table class="tbl" data-plain><thead><tr><th>Ingredient</th><th class="right">Left</th><th class="right">Alert at</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for r in stock_rows %}<tr><td><b>{{ r.st.ingredient.name }}</b></td><td class="right">{{ r.st.quantity|num }} {{ r.st.ingredient.unit }}</td><td class="right muted">{{ r.st.level|num }}</td>
+    <td>{% if r.out %}<span class="badge b-red">Out</span>{% elif r.low %}<span class="badge b-amber">Low</span>{% else %}<span class="badge b-green">OK</span>{% endif %}</td>
+    <td class="right">{% if r.low or r.out %}<button class="btn sm" type="button" onclick="fillReq({{ r.st.ingredient_id }}, '{{ r.suggest }}')">Request</button>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
+
+<div class="cols eq" style="margin-top:14px"><form class="card" method="post" action="{% url 'request_stock' %}" id="reqform">{% csrf_token %}
+  <div class="card-h"><h2>Need more stock?</h2></div>
+  <div class="card-b" style="display:grid;gap:10px">
+    <select class="select" name="ingredient" id="req-ing" required><option value="">Choose ingredient...</option>
+      {% for st in all_ings %}<option value="{{ st.ingredient_id }}">{{ st.ingredient.name }} - {{ st.quantity|num }} {{ st.ingredient.unit }} left</option>{% endfor %}</select>
+    <input class="input" name="qty" id="req-qty" type="number" step="0.001" min="0.001" placeholder="Quantity needed" required>
+    <input class="input" name="note" placeholder="Note (optional)">
+    <label class="small"><input type="checkbox" name="urgent"> Urgent - needed today</label>
+    <button class="btn primary">Send request to manager</button>
+    <p class="small muted" style="margin:0">The manager approves it and it goes straight into a purchase order for the supplier.</p>
+  </div></form>
+  <div class="card"><div class="card-h"><h2>My requests</h2></div><div class="card-b">
+    {% for q in my_reqs %}<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line)">
+      <span><b>{{ q.ingredient.name }}</b> <span class="muted small">{{ q.qty|num }} {{ q.ingredient.unit }}{% if q.urgent %} · urgent{% endif %} · {{ q.created_at|date:"d M H:i" }}</span>
+        {% if q.decided_at %}<div class="small muted">{{ q.get_status_display }} by {{ q.decided_by.display_name|default:"manager" }} · {{ q.decided_at|date:"d M H:i" }}{% if q.decision_note %} · "{{ q.decision_note }}"{% endif %}</div>{% else %}<div class="small muted">Sent to the manager - waiting for a decision</div>{% endif %}</span>
+      <span>{% if q.status == "pending" %}<span class="badge b-amber">Waiting</span>{% elif q.status == "approved" %}<span class="badge b-green">Approved{% if q.po %} · {{ q.po.number }}{% endif %}</span>{% else %}<span class="badge b-red">Rejected</span>{% endif %}</span></div>
+    {% empty %}<div class="muted small">No requests yet.</div>{% endfor %}</div></div></div>
+<script>function fillReq(id, q) { document.getElementById("req-ing").value = id; document.getElementById("req-qty").value = q; document.getElementById("reqform").scrollIntoView({behavior: "smooth", block: "center"}); }</script>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+(function () {
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmt(s) { s = Math.max(0, s); return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60); }
+  function tick() {
+    var now = Date.now();
+    document.querySelectorAll(".timer[data-since]").forEach(function (el) {
+      var sec = Math.floor((now - Date.parse(el.dataset.since)) / 1000);
+      el.textContent = fmt(sec);
+      var t = parseInt(el.dataset.target || "0");
+      if (t) { el.classList.toggle("late", sec > t); el.classList.toggle("warn", sec > t * 0.75 && sec <= t); }
+    });
+  }
+  setInterval(tick, 1000); tick();
+
+  // live board: refresh every 5s without reloading the page; beep when a new order arrives
+  var last = parseInt(document.getElementById("board").dataset.count || "0");
+  function beep() { try { var c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain();
+    o.connect(g); g.connect(c.destination); o.frequency.value = 880; g.gain.value = 0.08; o.start(); setTimeout(function () { o.stop(); c.close(); }, 220); } catch (e) {} }
+  setInterval(function () {
+    if (document.hidden) return;
+    fetch(location.href, {credentials: "same-origin", headers: {"X-Requested-With": "fetch"}}).then(function (r) { return r.text(); }).then(function (html) {
+      var doc = new DOMParser().parseFromString(html, "text/html"), nb = doc.getElementById("board");
+      if (!nb) return;
+      var n = parseInt(nb.dataset.count || "0");
+      document.getElementById("board").innerHTML = nb.innerHTML; document.getElementById("board").dataset.count = n;
+      if (n > last) beep(); last = n; tick();
+    }).catch(function () {});
+  }, 5000);
+})();
+</script>
+{% endblock %}

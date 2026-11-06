@@ -1,0 +1,22 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Recipes</h1><p>Which ingredients each dish uses, what it costs to make, and whether the {% if branch %}{{ branch.name }}{% else %}selected branch{% endif %} stock can make it.</p></div>
+  <div class="row"><a class="btn" href="{% url 'ingredients' %}">{% icon 'package' 16 %} Ingredients</a></div></div>
+<div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
+  <a class="badge {% if not show %}b-blue{% else %}b-grey{% endif %}" href="?">All dishes</a>
+  <a class="badge {% if show == 'missing' %}b-blue{% else %}b-amber{% endif %}" href="?show=missing">No recipe: {{ missing }}</a>
+  <a class="badge {% if show == 'low' %}b-blue{% else %}b-red{% endif %}" href="?show=low">Low / sold out: {{ lowc }}</a></div>
+{% if not branch %}<div class="msg warning" style="margin-bottom:12px">Select a branch in the top bar to see stock availability per dish.</div>{% endif %}
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Dish</th><th>Ingredients</th><th class="right">Cost / portion</th><th class="right">Price</th><th class="right">Margin</th><th class="right">Food cost %</th><th>Can make</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr>
+  <td><b>{{ r.item.name }}</b><div class="small muted">{{ r.item.category.name }}</div></td>
+  <td>{% if r.n %}{{ r.n }}{% else %}<span class="badge b-amber">No recipe</span>{% endif %}</td>
+  <td class="right">{% if r.n %}{{ r.cost|num }}{% else %}—{% endif %}</td><td class="right">{{ r.price|num }}</td>
+  <td class="right">{% if r.margin is not None %}<b style="color:{% if r.margin < 0 %}var(--red){% else %}var(--green){% endif %}">{{ r.margin|num }}</b>{% else %}—{% endif %}</td>
+  <td class="right">{% if r.fc is not None %}<span class="badge {% if r.fc > 40 %}b-red{% elif r.fc > 33 %}b-amber{% else %}b-green{% endif %}">{{ r.fc|floatformat:0 }}%</span>{% else %}—{% endif %}</td>
+  <td>{% if r.status == 'out' %}<span class="badge b-red">Sold out</span> <span class="small muted">{{ r.limiting }}</span>
+      {% elif r.status == 'low' %}<span class="badge b-amber">Low</span> <span class="small muted">{% for x in r.low %}{{ x.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+      {% elif r.status == 'ok' and r.max is not None %}<span class="badge b-green">{{ r.max }} portions</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+  <td class="right">{% if can_edit %}<a class="btn sm" href="{% url 'recipe' r.item.pk %}">{% icon 'edit' 14 %} {% if r.n %}Edit{% else %}Add recipe{% endif %}</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="8" class="empty">Nothing to show.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

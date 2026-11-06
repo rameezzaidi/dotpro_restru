@@ -1,0 +1,10 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Stock history</h1><p>Latest 200 movements</p></div><a class="btn" href="{% url 'stock' %}">← {% tr "Stock" %}</a></div>
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>{% tr "Date" %}</th><th>{% tr "Branches" %}</th><th>{% tr "Ingredients" %}</th><th data-sum>Change</th><th>Reason</th><th>Ref</th><th>User</th></tr></thead><tbody>
+{% for m in moves %}<tr><td class="small muted nowrap">{{ m.created_at|date:"d M H:i" }}</td><td>{{ m.branch.code }}</td><td>{{ m.ingredient.name }}</td>
+  <td><span class="badge {% if m.change < 0 %}b-red{% else %}b-green{% endif %}">{{ m.change|num }} {{ m.ingredient.unit }}</span></td>
+  <td>{{ m.reason }}</td><td>{{ m.ref }} <span class="muted small">{{ m.note }}</span></td><td>{{ m.user.display_name|default:"—" }}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">No movements yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Smart ordering</h1><p>Forecast of what {{ branch.name }} will use in the next 7 days (from sales history x recipes) against what is in stock.</p></div>
+  {% if picker %}<form method="get"><select class="input" name="b" onchange="this.form.submit()">{% for b in picker %}<option value="{{ b.pk }}" {% if b.pk == branch.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></form>{% endif %}</div>
+{% if ai.days_of_data < 7 %}<div class="card-b card" style="margin-bottom:12px">Only {{ ai.days_of_data }} day(s) of sales so far - the forecast gets better with more history.</div>{% endif %}
+<form method="post" class="card">{% csrf_token %}<div class="tbl-wrap"><table class="tbl" data-plain><thead><tr><th></th><th>Ingredient</th><th class="right">In stock</th><th class="right">Needed (7 days)</th><th class="right">Lasts</th><th class="right">Order qty</th><th>Supplier</th></tr></thead><tbody>
+{% for r in rows %}<tr><td><input type="checkbox" name="pick" value="{{ r.id }}" {% if r.need_order %}checked{% endif %}></td>
+  <td><b>{{ r.name }}</b> {% if r.status == "order" %}<span class="badge b-red">Order now</span>{% elif r.status == "soon" %}<span class="badge b-amber">Soon</span>{% endif %}</td>
+  <td class="right">{{ r.stock|num }} {{ r.unit }}</td><td class="right">{{ r.need|num }} {{ r.unit }}</td><td class="right">{% if r.cover < 90 %}{{ r.cover|floatformat:1 }} days{% else %}-{% endif %}</td>
+  <td class="right"><input class="input" style="width:100px;text-align:right" name="qty_{{ r.id }}" value="{{ r.buy }}" step="0.1" type="number"> {{ r.unit }}</td>
+  <td class="small">{% if r.supplier %}default supplier{% else %}<span class="badge b-amber">none set</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">No forecast yet - needs some completed orders with recipes.</td></tr>{% endfor %}</tbody></table></div>
+{% if rows %}<div class="card-b" style="border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="small muted">Creates one draft PO per supplier. Review it, then approve and send - the supplier gets it automatically.</span><button class="btn primary">Create draft purchase orders</button></div>{% endif %}</form>
+{% endblock %}

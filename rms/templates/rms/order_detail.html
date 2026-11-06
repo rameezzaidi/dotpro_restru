@@ -1,0 +1,218 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ o.number }} {% status_badge o %}{% if o.bill_requested_at and o.is_active %} <span class="badge b-amber">Bill requested</span>{% endif %}</h1>
+    <p>{{ o.get_order_type_display|t:lang }} · {{ o.branch.name }} · {{ o.source.name|default:"—" }}{% if o.external_ref %} · Ref {{ o.external_ref }}{% endif %} · {{ o.created_at|date:"d M Y, H:i" }}{% if o.parent %} · split from <a href="{% url 'order_detail' o.parent.pk %}">{{ o.parent.number }}</a>{% endif %}</p></div>
+  <div class="row">
+    <a class="btn" href="{% url 'kot' o.pk %}" target="_blank">{% icon 'flame' 16 %} KOT</a>
+    <a class="btn" href="{% url 'receipt' o.pk %}" target="_blank">{% icon 'print' 16 %} {% if o.bill_number %}Bill{% else %}Pre-bill{% endif %}</a>
+    <a class="btn" href="{% url 'orders' %}">← {% tr "Orders" %}</a></div>
+</div>
+
+{% if o.acceptance == "pending" and o.status == "new" %}<div class="add-banner" style="margin-bottom:12px">⏳ Online order waiting for acceptance - <a href="{% url 'online_orders' %}"><b>Accept or Reject</b></a></div>{% endif %}
+<div class="cols">
+  <div class="card">
+    <div class="card-h"><h2>{% tr "Items" %}</h2>
+      {% if o.is_active and o.status != 'out_for_delivery' %}<a class="btn sm primary" href="{% url 'pos' %}?add={{ o.pk }}">{% icon 'plus' 14 %} Add items</a>{% endif %}</div>
+    <div class="tbl-wrap"><table class="tbl"><tbody>
+      {% for l in lines %}<tr {% if l.is_void %}style="opacity:.55"{% endif %}>
+        <td>{% if l.is_void %}<s><b>{{ l.name }}</b></s> <span class="badge b-red">void</span><div class="small muted">{{ l.void_reason }}</div>
+          {% else %}<b>{{ l.name }}</b> {% if l.round > 1 %}<span class="badge b-grey">KOT {{ l.round }}</span>{% endif %}{% if l.notes %}<div class="small muted">{{ l.notes }}</div>{% endif %}{% endif %}</td>
+        <td>× {{ l.qty }}</td><td class="right">{{ l.price|money:o.branch }}</td>
+        <td class="right">{% if l.is_void %}—{% else %}<b>{{ l.line_total|money:o.branch }}</b>{% endif %}</td>
+        <td class="right">{% if o.is_active and not l.is_void and can_cashier %}<button type="button" class="btn sm" data-void="{{ l.pk }}" data-name="{{ l.name }}" title="Void item">{% icon 'x' 13 %}</button>{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="totals" style="border-radius:0 0 14px 14px">
+      <div class="t"><span>{% tr "Subtotal" %}</span><span>{{ o.subtotal|money:o.branch }}</span></div>
+      {% if o.discount %}<div class="t"><span>{% tr "Discount" %}</span><span>− {{ o.discount|money:o.branch }}</span></div>{% endif %}
+      {% if o.service_charge %}<div class="t"><span>{% tr "Service charge" %}</span><span>{{ o.service_charge|money:o.branch }}</span></div>{% endif %}
+      {% if o.tax %}<div class="t"><span>{% tr "Tax" %}</span><span>{{ o.tax|money:o.branch }}</span></div>{% endif %}
+      {% if o.delivery_fee %}<div class="t"><span>{% tr "Delivery fee" %}</span><span>{{ o.delivery_fee|money:o.branch }}</span></div>{% endif %}
+      <div class="t grand"><span>{% tr "Total" %}</span><span>{{ o.total|money:o.branch }}</span></div>
+      {% if payments %}<div class="t"><span>Paid</span><span>{{ o.paid_total|money:o.branch }}</span></div>
+      <div class="t"><span><b>Balance due</b></span><span><b>{{ o.due|money:o.branch }}</b></span></div>{% endif %}
+    </div>
+  </div>
+
+  <div style="display:grid;gap:16px;align-content:start">
+    {% if cfg.payment_gateway != "none" and o.status != "cancelled" %}<div class="card"><div class="card-h"><h2>{% icon 'wallet' 18 %} Online payment</h2><span class="badge b-grey">{{ cfg.get_payment_gateway_display }}</span></div><div class="card-b">
+      {% if o.due > 0 and can_cashier %}{% if pay_link %}<div class="small muted">Share this link or let the customer scan:</div><div style="width:96px;margin:8px 0">{% qr_svg pay_url 3 %}</div><a class="small" href="{% url 'pay_page' pay_link.token %}" target="_blank">{% url 'pay_page' pay_link.token %}</a>
+        {% else %}<form method="post" action="{% url 'order_pay_link' o.pk %}">{% csrf_token %}<button class="btn sm">Create payment link ({{ o.due|money:o.branch }})</button></form>{% endif %}
+      {% elif pay_paid %}<span class="badge b-green">Paid online</span>{% else %}<div class="small muted">Nothing due.</div>{% endif %}</div></div>{% endif %}
+    <div class="card"><div class="card-h"><h2>{% icon 'print' 18 %} Thermal printer</h2></div><div class="card-b">
+      {% if o.branch.receipt_printer_host or o.branch.kitchen_printer_host %}<div class="row" style="gap:8px;flex-wrap:wrap">
+        <form method="post" action="{% url 'order_print' o.pk 'kot' %}">{% csrf_token %}<button class="btn sm">Print KOT</button></form>
+        {% if can_cashier %}<form method="post" action="{% url 'order_print' o.pk 'receipt' %}">{% csrf_token %}<button class="btn sm">Print bill</button></form>{% endif %}</div>
+      {% else %}<div class="small muted">No printer IP set for this branch (Branches → edit). You can still download raw ESC/POS below.</div>{% endif %}
+      <div class="small" style="margin-top:8px"><a href="{% url 'order_escpos' o.pk 'kot' %}">KOT .bin</a>{% if can_cashier %} · <a href="{% url 'order_escpos' o.pk 'receipt' %}">Bill .bin</a>{% endif %}</div></div></div>
+    {% if o.customer %}<div class="card"><div class="card-h"><h2>{% icon 'users' 18 %} Customer</h2></div><div class="card-b">
+      <div class="row" style="justify-content:space-between"><a href="{% url 'customer_detail' o.customer.pk %}"><b>{{ o.customer.name|default:o.customer.phone }}</b></a><span class="badge b-brand">{{ o.customer.tier }}</span></div>
+      <div class="small muted">{{ o.customer.visits }} visits · {{ o.customer.points }} points (worth {{ cust_worth|money:o.branch }})</div>
+      {% if cfg.loyalty_enabled %}{% if o.is_active and can_cashier and not payments and o.customer.points %}<form method="post" action="{% url 'order_action' o.pk %}" class="row" style="gap:6px;margin-top:8px">{% csrf_token %}<input type="hidden" name="action" value="redeem"><input class="input" type="number" min="1" max="{{ o.customer.points }}" name="points" value="{{ o.customer.points }}" style="width:100px"><button class="btn sm">Redeem points</button></form>{% endif %}
+      {% if o.status != "completed" and o.status != "cancelled" %}<div class="small muted" style="margin-top:6px">Will earn ≈ {{ earn_pts }} points on completion.</div>{% endif %}{% endif %}
+    </div></div>
+    {% endif %}
+    <div class="card"><div class="card-h"><h2>{% icon 'star' 18 %} Customer feedback</h2></div><div class="card-b">
+      {% if fb %}<div>Service: <b>{{ fb.service_rating|default:"—" }}★</b></div>
+        {% for i in fb.items.all %}<div class="row" style="justify-content:space-between;margin:5px 0"><span>{{ i.name }}{% if i.comment %}<div class="small muted">“{{ i.comment }}”</div>{% endif %}</span><b>{{ i.rating|default:"—" }}★</b></div>{% endfor %}
+        {% if fb.comment %}<div class="small" style="margin-top:8px">“{{ fb.comment }}”</div>{% endif %}
+      {% else %}<div class="small muted">No feedback yet. Customer scans the QR on the bill, or open the link:</div>
+        <div style="width:96px;margin:8px 0">{% qr_svg fb_url 3 %}</div><a class="small" href="{{ fb_url }}" target="_blank">{{ fb_url }}</a>{% endif %}
+    </div></div>
+    <div class="card"><div class="card-b">
+      <div class="row" style="justify-content:space-between"><b>{% tr "Status" %}</b>{% status_badge o %}</div>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><b>{% tr "Paid" %}</b>
+        {% if o.is_paid and o.total %}<span class="badge b-green">{{ o.get_payment_method_display }}</span>
+        {% elif payments and o.paid_total > 0 %}<span class="badge b-blue">Partial · due {{ o.due|money:o.branch }}</span>
+        {% else %}<span class="badge b-amber">{{ "Unpaid"|t:lang }}</span>{% endif %}</div>
+      {% if o.bill_number %}<div class="row" style="justify-content:space-between;margin-top:8px"><b>Bill</b><a href="{% url 'receipt' o.pk %}" target="_blank"><span class="badge b-blue">{{ o.bill_number }}</span></a></div>{% endif %}
+      {% if o.table %}<div class="row" style="justify-content:space-between;margin-top:8px"><b>{% tr "Table" %}</b><span>{{ o.table.name }} · {{ o.table.area }}</span></div>{% endif %}
+      {% if o.customer_name or o.customer_phone %}<div style="margin-top:10px" class="small"><b>{{ o.customer_name }}</b> {% if o.customer_phone %}· {% icon 'phone' 13 %} {{ o.customer_phone }}{% endif %}</div>{% endif %}
+      {% if o.customer_address %}<div class="small muted">{% icon 'map' 13 %} {{ o.customer_address }}</div>{% endif %}
+      {% if o.notes %}<div class="small muted" style="margin-top:6px">{% tr "Notes" %}: {{ o.notes }}</div>{% endif %}
+      {% if o.cancel_reason %}<div class="small" style="margin-top:6px;color:var(--red)">Cancelled: {{ o.cancel_reason }}</div>{% endif %}
+      {% if splits %}<div class="small muted" style="margin-top:6px">Split bills: {% for c in splits %}<a href="{% url 'order_detail' c.pk %}">{{ c.number }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+    </div></div>
+
+    {% if o.status != 'cancelled' %}
+    <div class="card"><div class="card-b">
+      <div class="row" style="justify-content:space-between"><b>{% icon 'flame' 16 %} Kitchen{% if o.kot_round > 1 %} <span class="small muted">· KOT round {{ o.kot_round }}</span>{% endif %}</b>
+        {% if queue_pos %}<span class="badge b-blue">Waiting · #{{ queue_pos }} in queue</span>
+        {% elif o.status == 'preparing' %}<span class="badge b-amber">Cooking{% if o.chef %} · {{ o.chef.display_name }}{% endif %}</span>
+        {% elif o.ready_at %}<span class="badge b-green">Done{% if o.chef %} · {{ o.chef.display_name }}{% endif %}</span>{% endif %}</div>
+      {% if o.status == 'new' %}<div class="row" style="justify-content:space-between;margin-top:8px"><span class="muted small">In queue for</span><span class="timer" data-since="{{ o.created_at|date:'c' }}">00:00:00</span></div>
+      {% elif o.status == 'preparing' %}<div class="row" style="justify-content:space-between;margin-top:8px"><span class="muted small">Cooking for</span><span class="timer big" data-since="{{ o.started_at|date:'c' }}">00:00:00</span></div>
+      {% elif o.started_at and o.ready_at %}<div class="row" style="justify-content:space-between;margin-top:8px"><span class="muted small">Prep time</span><b>{{ o.started_at|timesince:o.ready_at }}</b></div>{% endif %}
+    </div></div>
+    {% endif %}
+
+    {% if payments %}
+    <div class="card"><div class="card-b">
+      <b>Payments</b>
+      {% for p in payments %}<div class="row small" style="justify-content:space-between;margin-top:6px">
+        <span>{{ p.get_method_display }}{% if p.amount < 0 %} <span class="badge b-red">refund</span>{% endif %}<span class="muted"> · {{ p.created_at|date:"H:i" }}{% if p.user %} · {{ p.user.display_name }}{% endif %}</span></span>
+        <span><b>{{ p.amount|money:o.branch }}</b>{% if p.tip %} <span class="muted">+ tip {{ p.tip|money:o.branch }}</span>{% endif %}{% if p.change %} <span class="muted">· change {{ p.change|money:o.branch }}</span>{% endif %}</span></div>{% endfor %}
+    </div></div>
+    {% endif %}
+
+    {% if o.is_active %}
+    <div class="card"><div class="card-b" style="display:grid;gap:10px">
+      {% if o.next_status %}
+      <form method="post" action="{% url 'order_action' o.pk %}" class="row" style="flex-wrap:nowrap">{% csrf_token %}
+        <input type="hidden" name="action" value="advance">
+        {% if o.next_status == 'completed' and o.due > 0 %}
+          <select name="method" class="input">{% for v, l in methods %}<option value="{{ v }}">{{ l|t:lang }}</option>{% endfor %}</select>{% endif %}
+        <button class="btn primary block">{% icon 'arrow' 16 %} Mark {{ o.next_status }}{% if o.next_status == 'completed' and o.due > 0 %} &amp; collect {{ o.due|money:o.branch }}{% endif %}</button>
+      </form>{% endif %}
+
+      {% if o.order_type == 'dine_in' and not o.bill_requested_at %}
+      <form method="post" action="{% url 'order_action' o.pk %}">{% csrf_token %}<input type="hidden" name="action" value="request_bill">
+        <button class="btn block">{% icon 'file' 16 %} Request bill</button></form>{% endif %}
+
+      {% if o.due > 0 and can_cashier %}
+      <form method="post" action="{% url 'order_action' o.pk %}" id="payform" data-due="{{ o.due|stringformat:'s' }}" style="display:grid;gap:8px">{% csrf_token %}
+        <input type="hidden" name="action" value="pay">
+        <div class="row" style="justify-content:space-between"><b>Take payment</b><span class="small muted">Due <b>{{ o.due|money:o.branch }}</b></span></div>
+        <div class="row" style="flex-wrap:nowrap">
+          <select name="method" id="pm" class="input">{% for v, l in methods %}<option value="{{ v }}">{{ l|t:lang }}</option>{% endfor %}</select>
+          <input name="amount" id="pamt" class="input" type="number" step="0.01" min="0.01" value="{{ o.due|stringformat:'s' }}" title="Amount to pay now">
+        </div>
+        <div class="row" style="flex-wrap:nowrap">
+          <input name="tendered" id="ptend" class="input" type="number" step="0.01" min="0" placeholder="Cash received">
+          <input name="tip" class="input" type="number" step="0.01" min="0" placeholder="Tip" style="max-width:110px">
+        </div>
+        <div class="small muted" id="pchange"></div>
+        <div class="row small" style="gap:6px;flex-wrap:wrap"><span class="muted">Split equally:</span>
+          {% for n in "2345" %}<button type="button" class="btn sm" data-split="{{ n }}">÷{{ n }}</button>{% endfor %}
+          <button type="button" class="btn sm" data-split="1">Full</button></div>
+        <button class="btn green block">{% icon 'check' 16 %} {% tr "Pay now" %}</button>
+        {% if not shift %}<div class="small muted">No open shift — payments aren't tracked in a cashier shift. <a href="{% url 'shifts' %}">Open shift</a></div>{% endif %}
+      </form>{% endif %}
+
+      {% if o.order_type == 'delivery' %}
+      <form method="post" action="{% url 'order_action' o.pk %}" class="row" style="flex-wrap:nowrap">{% csrf_token %}
+        <input type="hidden" name="action" value="assign_rider">
+        <select name="rider" class="input" required><option value="">{% tr "Rider" %}…</option>
+          {% for r in riders %}<option value="{{ r.id }}" {% if o.rider_id == r.id %}selected{% endif %}>{{ r.name }} · {{ r.get_status_display }}</option>{% endfor %}</select>
+        <button class="btn">{% icon 'bike' 16 %} Assign</button></form>
+      {% if o.rider %}<div class="small muted">{% tr "Rider" %}: <b>{{ o.rider.name }}</b> {{ o.rider.phone }}</div>{% endif %}
+      {% endif %}
+
+      {% if o.order_type == 'dine_in' %}
+      <form method="post" action="{% url 'order_action' o.pk %}" class="row" style="flex-wrap:nowrap">{% csrf_token %}
+        <input type="hidden" name="action" value="assign_waiter">
+        <select name="waiter" class="input"><option value="">{% tr "Waiter" %}…</option>
+          {% for w in waiters %}<option value="{{ w.id }}" {% if o.waiter_id == w.id %}selected{% endif %}>{{ w.display_name }}</option>{% endfor %}</select>
+        <button class="btn">{% icon 'user' 16 %} Assign</button></form>
+      {% if free_tables %}
+      <form method="post" action="{% url 'order_action' o.pk %}" class="row" style="flex-wrap:nowrap">{% csrf_token %}
+        <input type="hidden" name="action" value="move_table">
+        <select name="table" class="input" required><option value="">Move to table…</option>
+          {% for t in free_tables %}<option value="{{ t.id }}">{{ t.name }} · {{ t.area }}</option>{% endfor %}</select>
+        <button class="btn">{% icon 'repeat' 16 %} Move</button></form>{% endif %}
+      {% endif %}
+
+      {% if can_cashier %}
+      <div class="row" style="flex-wrap:nowrap">
+        {% if live_lines|length > 1 and not payments %}<button type="button" class="btn block" data-open="dlg-split">{% icon 'layers' 16 %} Split bill</button>{% endif %}
+        <button type="button" class="btn danger block" data-open="dlg-cancel">{% icon 'x' 16 %} {% tr "Cancel" %} order</button>
+      </div>{% endif %}
+    </div></div>
+    {% endif %}
+    {% if o.waiter and not o.is_active %}<div class="small muted">{% tr "Waiter" %}: {{ o.waiter.display_name }}</div>{% endif %}
+    {% if o.rider and not o.is_active %}<div class="small muted">{% tr "Rider" %}: {{ o.rider.name }}</div>{% endif %}
+  </div>
+</div>
+
+{# ---------- dialogs: void item, cancel order, split bill ---------- #}
+<dialog id="dlg-void" class="dlg"><form method="post" action="{% url 'order_action' o.pk %}">{% csrf_token %}
+  <input type="hidden" name="action" value="void_line"><input type="hidden" name="line" id="void-line">
+  <h3>Void item: <span id="void-name"></span></h3>
+  {% include "rms/_reason_fields.html" %}
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn" data-close>Back</button><button class="btn danger">Void item</button></div>
+</form></dialog>
+<dialog id="dlg-cancel" class="dlg"><form method="post" action="{% url 'order_action' o.pk %}">{% csrf_token %}
+  <input type="hidden" name="action" value="cancel">
+  <h3>Cancel order {{ o.number }}</h3>
+  {% if o.paid_total > 0 %}<p class="small" style="color:var(--amber)">This order has payments — {{ o.paid_total|money:o.branch }} will be refunded and logged.</p>{% endif %}
+  {% include "rms/_reason_fields.html" %}
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn" data-close>Back</button><button class="btn danger">Cancel order</button></div>
+</form></dialog>
+<dialog id="dlg-split" class="dlg"><form method="post" action="{% url 'order_action' o.pk %}">{% csrf_token %}
+  <input type="hidden" name="action" value="split">
+  <h3>Split bill</h3><p class="small muted">Enter how many of each item go on the <b>new bill</b> (same table). Each bill is paid separately.</p>
+  {% for l in live_lines %}<div class="row" style="justify-content:space-between;margin:6px 0"><span>{{ l.name }} <span class="muted">(× {{ l.qty }})</span></span>
+    <input class="input" type="number" min="0" max="{{ l.qty }}" name="qty_{{ l.pk }}" placeholder="0" style="width:80px"></div>{% endfor %}
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn" data-close>Back</button><button class="btn primary">Create new bill</button></div>
+</form></dialog>
+
+{% if auto_kot %}<iframe src="{% url 'kot' o.pk %}?print=1" style="position:absolute;width:0;height:0;border:0" title="KOT"></iframe>{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+(function () { function p(n){return (n<10?"0":"")+n} function f(s){s=Math.max(0,s);return p(Math.floor(s/3600))+":"+p(Math.floor(s%3600/60))+":"+p(s%60)}
+  function tick(){document.querySelectorAll(".timer[data-since]").forEach(function(e){e.textContent=f(Math.floor((Date.now()-Date.parse(e.dataset.since))/1000))})}
+  setInterval(tick,1000);tick();
+  // dialogs
+  document.addEventListener("click", function (e) {
+    var op = e.target.closest("[data-open]"); if (op) { document.getElementById(op.dataset.open).showModal(); }
+    var v = e.target.closest("[data-void]");
+    if (v) { document.getElementById("void-line").value = v.dataset.void; document.getElementById("void-name").textContent = v.dataset.name; document.getElementById("dlg-void").showModal(); }
+    if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); }
+  });
+  // payment form helpers: split equally, change calculation
+  var pf = document.getElementById("payform");
+  if (pf) {
+    var due = parseFloat(pf.dataset.due), amt = document.getElementById("pamt"), ten = document.getElementById("ptend"), pm = document.getElementById("pm"), ch = document.getElementById("pchange");
+    function upd() {
+      var cash = pm.value === "cash"; ten.style.display = cash ? "" : "none";
+      var a = parseFloat(amt.value) || 0, t = parseFloat(ten.value) || 0;
+      ch.textContent = cash && t > a ? "Change to return: " + (t - a).toFixed(2) : "";
+    }
+    pf.addEventListener("click", function (e) {
+      var s = e.target.closest("[data-split]"); if (!s) return;
+      var n = parseInt(s.dataset.split); amt.value = (Math.ceil(due / n * 100) / 100).toFixed(2); if (parseFloat(amt.value) > due) amt.value = due.toFixed(2); upd();
+    });
+    ["input", "change"].forEach(function (ev) { pf.addEventListener(ev, upd); }); upd();
+  }
+})();
+</script>{% endblock %}

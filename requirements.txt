@@ -1,0 +1,7 @@
+Django>=5.0
+Pillow
+tzdata
+whitenoise
+# Optional (production DB): psycopg[binary]  /  mysqlclient
+segno   # QR code on the receipt for customer feedback
+psycopg[binary]>=3.1   # PostgreSQL (needed on Vercel)

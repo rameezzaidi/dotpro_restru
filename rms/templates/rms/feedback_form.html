@@ -1,0 +1,32 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rate your order · {{ o.branch.name }}</title><link rel="stylesheet" href="{% static 'rms/app.css' %}">
+<style>
+.stars{display:inline-flex;flex-direction:row-reverse;gap:2px}.stars input{display:none}
+.stars label{font-size:34px;line-height:1;color:#d9d4c4;cursor:pointer;padding:0 2px}
+.stars input:checked ~ label,.stars label:hover,.stars label:hover ~ label{color:#e0a020}
+.fi{padding:14px 0;border-bottom:1px dashed var(--line)}.fi:last-child{border:0}
+</style></head>
+<body><div style="max-width:520px;margin:22px auto;padding:0 14px">
+<div class="card"><div class="card-b">
+  <div class="brand" style="justify-content:center;text-align:center">{{ o.branch.name }}</div>
+  {% if state == "early" %}
+    <h2 style="text-align:center">Thank you for dining with us</h2><p class="muted" style="text-align:center">Feedback opens once your order is completed. Please come back in a few minutes.</p>
+  {% elif state == "thanks" %}
+    <h2 style="text-align:center">{% if just %}Thank you! 🙏{% else %}Feedback already received{% endif %}</h2>
+    <p class="muted" style="text-align:center">Your feedback for order {{ o.number }} helps us improve. We hope to see you again.</p>
+  {% else %}
+    <h2 style="text-align:center;margin:8px 0 2px">How was your order?</h2>
+    <p class="muted small" style="text-align:center;margin:0 0 10px">Order {{ o.number }} · takes 20 seconds</p>
+    {% if error %}<div class="msg warning">{{ error }}</div>{% endif %}
+    <form method="post">{% csrf_token %}
+      {% for it in items %}<div class="fi"><div class="row" style="justify-content:space-between;align-items:center"><b>{{ it.name }}{% if it.qty > 1 %} × {{ it.qty }}{% endif %}</b>
+        <span class="stars">{% for n in "54321" %}<input type="radio" id="r{{ it.key }}{{ n }}" name="r_{{ it.key }}" value="{{ n }}"><label for="r{{ it.key }}{{ n }}">★</label>{% endfor %}</span></div>
+        <input class="input" name="c_{{ it.key }}" maxlength="300" placeholder="Anything about this dish? (optional)" style="margin-top:6px"></div>{% endfor %}
+      <div class="fi"><div class="row" style="justify-content:space-between;align-items:center"><b>{% if o.waiter %}Service by {{ o.waiter.display_name }}{% elif o.rider %}Delivery by {{ o.rider.name }}{% else %}Our service{% endif %}</b>
+        <span class="stars">{% for n in "54321" %}<input type="radio" id="s{{ n }}" name="service" value="{{ n }}"><label for="s{{ n }}">★</label>{% endfor %}</span></div></div>
+      <textarea class="input" name="comment" maxlength="500" rows="3" placeholder="Any other comments? (English / Urdu both fine)"></textarea>
+      <button class="btn primary" style="width:100%;margin-top:14px;min-height:46px">Submit feedback</button>
+    </form>
+  {% endif %}
+</div></div></div></body></html>

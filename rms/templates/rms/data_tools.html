@@ -1,0 +1,29 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Backup, Export &amp; Import</h1><p>Download your data as Excel-ready CSV, take a full backup, or bulk-load the menu and ingredients from a spreadsheet.</p></div></div>
+{% if result %}<div class="card" style="margin-bottom:16px;border-color:{% if result.n_errors %}var(--amber){% else %}var(--green){% endif %}"><div class="card-b">
+  <b>Import of {{ result.what }} finished:</b> {{ result.created }} added, {{ result.updated }} updated{% if result.n_errors %}, <span style="color:var(--red)">{{ result.n_errors }} row(s) skipped</span>{% endif %}.
+  {% if result.errors %}<ul class="small" style="margin:8px 0 0">{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}</div></div>{% endif %}
+<div class="cols eq">
+<div class="card"><div class="card-h"><h2>{% icon 'file' 18 %} Export to CSV (Excel)</h2></div><div class="card-b">
+  <form method="get" action="{% url 'export_csv' 'orders' %}" class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><b style="min-width:70px">Orders</b>
+    <input class="input" type="date" name="from" value="{{ month_ago|date:'Y-m-d' }}" style="width:auto"><input class="input" type="date" name="to" value="{{ today|date:'Y-m-d' }}" style="width:auto"><button class="btn sm">Download</button></form>
+  <div class="row" style="gap:8px;flex-wrap:wrap">
+    <a class="btn sm" href="{% url 'export_csv' 'order_items' %}">Order items</a><a class="btn sm" href="{% url 'export_csv' 'customers' %}">Customers</a>
+    <a class="btn sm" href="{% url 'export_csv' 'menu' %}">Menu</a><a class="btn sm" href="{% url 'export_csv' 'ingredients' %}">Ingredients</a>
+    <a class="btn sm" href="{% url 'export_csv' 'stock' %}">Stock</a><a class="btn sm" href="{% url 'export_csv' 'suppliers' %}">Suppliers</a>
+    <a class="btn sm" href="{% url 'export_csv' 'staff' %}">Staff</a>{% if can_backup %}<a class="btn sm" href="{% url 'export_csv' 'audit' %}">Audit log</a>{% endif %}</div>
+  <p class="small muted" style="margin-top:12px">Only the branch you are working in is exported (master users: the selected branch or all).</p></div></div>
+<div class="card"><div class="card-h"><h2>{% icon 'layers' 18 %} Full backup</h2></div><div class="card-b">
+  {% if can_backup %}<p>One JSON file with the whole database (menu, orders, stock, customers, staff, photos...). Keep it somewhere safe - weekly is a good habit.</p>
+  <a class="btn primary" href="{% url 'backup' %}">Download full backup</a>
+  <p class="small muted" style="margin-top:10px">Restore on a clean install: <code>python manage.py migrate</code> then <code>python manage.py loaddata restopro-backup-....json</code>. On Vercel + Neon your data is also protected by Neon's own point-in-time restore.</p>
+  {% else %}<p class="muted">Full backups can be taken by the owner or the master-branch manager.</p>{% endif %}</div></div>
+</div>
+<div class="cols eq" style="margin-top:16px">
+{% for key, title in imports %}<div class="card"><div class="card-h"><h2>{% icon 'package' 18 %} Import {{ title }} from CSV</h2><a class="small" href="{% url 'import_sample' key %}">sample file</a></div><div class="card-b">
+  <form method="post" action="{% url 'import_csv' key %}" enctype="multipart/form-data">{% csrf_token %}
+    <input class="input" type="file" name="file" accept=".csv,text/csv" required style="margin-bottom:10px"><button class="btn primary">Import</button></form>
+  <p class="small muted" style="margin-top:10px">Existing rows with the same {% if key == 'menu' %}SKU or name{% else %}name{% endif %} are updated, new ones are added. Bad rows are skipped and listed.</p></div></div>{% endfor %}
+</div>
+{% endblock %}

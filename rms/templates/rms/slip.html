@@ -1,0 +1,11 @@
+{% load rms_tags %}<!doctype html><html><head><meta charset="utf-8"><title>Salary slip {{ d.label }} {{ month|date:"M Y" }}</title>
+<style>body{font:15px/1.6 system-ui,Segoe UI,Arial;margin:0;background:#f4f1ea;color:#222}.s{max-width:560px;margin:30px auto;background:#fff;padding:34px;border:1px solid #ddd;border-radius:6px}
+h1{margin:0;font-size:22px}.m{color:#777;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:18px}td{padding:9px 0;border-bottom:1px solid #eee}td:last-child{text-align:right}
+.t td{font-weight:700;font-size:18px;border-top:2px solid #222;border-bottom:0}.sig{display:flex;justify-content:space-between;margin-top:50px;color:#777;font-size:13px}.sig span{border-top:1px solid #999;padding-top:6px;width:42%;text-align:center}
+@media print{body{background:#fff}.s{border:0;margin:0}.np{display:none}}</style></head><body>
+<div class="s"><h1>{{ setting.business_name }}</h1><div class="m">{{ d.branch.name }} &middot; Salary slip &middot; {{ d.d1|date:"d M" }} - {{ d.d2|date:"d M Y" }}</div>
+<table><tr><td>Name</td><td><b>{{ d.label }}</b> ({{ d.kind|title }})</td></tr><tr><td>Orders handled</td><td>{{ d.orders }}</td></tr>
+<tr><td>Basic salary</td><td>{{ d.salary|money:d.branch }}</td></tr><tr><td>Commission</td><td>{{ d.commission|money:d.branch }}</td></tr>
+{% if d.kind == "rider" %}<tr><td>Delivery pay</td><td>{{ d.delivery_pay|money:d.branch }}</td></tr>{% endif %}<tr><td>Tips received</td><td>{{ d.tips|money:d.branch }}</td></tr>
+<tr class="t"><td>Total payable</td><td>{{ d.total|money:d.branch }}</td></tr></table>
+<div class="sig"><span>Prepared by</span><span>Received by</span></div><p class="np" style="text-align:center;margin-top:24px"><button onclick="print()">Print</button></p></div></body></html>

@@ -1,0 +1,48 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Channels & Apps" %}</h1><p>Every place orders come from: POS, your website, Foodpanda-style apps, WhatsApp… Each gets its own API key.</p></div>
+  {% if request.user.can_access_all %}<a class="btn primary" href="{% url 'channels_crud_add' %}">{% icon 'plus' 16 %} {% tr "Add" %} channel</a>{% endif %}</div>
+
+<div class="card tbl-wrap" style="margin-bottom:18px"><table class="tbl"><thead><tr><th>{% tr "Name" %}</th><th>{% tr "Type" %}</th><th>API key</th><th>Commission</th><th>{% tr "Orders" %}</th><th>{% tr "Status" %}</th><th class="right">{% tr "Actions" %}</th></tr></thead><tbody>
+{% for r in rows %}<tr>
+  <td><b>{{ r.ch.name }}</b><div class="small muted">{{ r.ch.code }}</div></td><td>{{ r.ch.get_kind_display }}</td>
+  <td>{% if request.user.can_access_all %}<code class="key">{{ r.ch.api_key|slice:":10" }}…</code> <button class="btn sm" data-copy="{{ r.ch.api_key }}">Copy</button>{% else %}<span class="muted small">hidden</span>{% endif %}</td>
+  <td>{{ r.ch.commission_percent }}%</td><td>{{ r.count }}</td>
+  <td>{% if r.ch.is_active %}<span class="badge b-green">Active</span>{% else %}<span class="badge b-grey">Off</span>{% endif %}</td>
+  <td class="actions">{% if request.user.can_access_all %}
+    <a class="btn sm" href="{% url 'channels_crud_edit' r.ch.pk %}">{% icon 'edit' 14 %}</a>
+    <form method="post" action="{% url 'channel_regen' r.ch.pk %}" style="display:inline">{% csrf_token %}<button class="btn sm" data-confirm="Old key will stop working. Continue?">{% icon 'key' 14 %} New key</button></form>
+    {% if r.ch.code != 'pos' and r.ch.code != 'website' %}<form method="post" action="{% url 'channel_remove' r.ch.pk %}" style="display:inline">{% csrf_token %}<button class="btn sm danger" data-confirm="Delete channel?">{% icon 'trash' 14 %}</button></form>{% endif %}{% endif %}</td>
+</tr>{% endfor %}</tbody></table></div>
+
+<div class="cols eq">
+  <div class="card"><div class="card-h"><h2>{% icon 'globe' 18 %} Your own ordering website</h2></div><div class="card-b">
+    <p style="margin-top:0">Customers can order delivery / takeaway online. Share this link (or embed it on your website):</p>
+    <p><code class="key">{{ base }}{% url 'site_branches' %}</code></p>
+    <p class="small muted">Per-branch link: <code class="key">{{ base }}/order/&lt;BRANCH_CODE&gt;/</code><br>
+    {% for b in branch_codes %}<span class="badge b-grey">{{ b.code }}</span> {% endfor %}</p>
+    <p class="small muted">Turn it on/off globally in Settings, or per branch in the branch form.</p>
+  </div></div>
+
+  <div class="card"><div class="card-h"><h2>{% icon 'link' 18 %} API for delivery apps / other websites</h2></div><div class="card-b">
+<p style="margin-top:0" class="small">Send orders into the POS with the channel's API key (header <code class="key">X-API-Key</code>). Duplicate <code class="key">external_id</code> values are ignored safely.</p>
+<pre class="code">POST {{ base }}/api/v1/orders/
+X-API-Key: &lt;channel key&gt;
+Content-Type: application/json
+
+{
+  "branch": "KHI",
+  "external_id": "FP-10234",
+  "order_type": "delivery",
+  "customer": {"name": "Ali", "phone": "0300...", "address": "DHA Ph 6"},
+  "paid": true, "payment_method": "online",
+  "items": [
+    {"sku": "BRG-01", "qty": 2},
+    {"name": "Special combo", "qty": 1, "price": 950}
+  ]
+}</pre>
+<pre class="code">GET {{ base }}/api/v1/menu/?branch=KHI           → branch menu (prices, SKUs)
+GET {{ base }}/api/v1/orders/&lt;order_number&gt;/     → live order status</pre>
+  </div></div>
+</div>
+{% endblock %}

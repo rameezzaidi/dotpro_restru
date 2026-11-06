@@ -1,0 +1,24 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{{ po.number }} <span class="badge {% if po.status == 'received' %}b-green{% elif po.status == 'cancelled' %}b-red{% elif po.status == 'partial' %}b-blue{% else %}b-amber{% endif %}">{{ po.get_status_display }}</span></h1>
+  <p>{{ po.supplier.name }} → {{ po.branch.name }} · {{ po.created_at|date:"d M Y" }}</p></div><a class="btn" href="{% url 'purchase_orders' %}">← Back</a></div>
+<form method="post" action="{% url 'po_action' po.pk %}">{% csrf_token %}<input type="hidden" name="action" value="receive">
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>{% tr "Ingredients" %}</th><th>Ordered</th><th>Received</th><th>Pending</th>{% if po.status == 'ordered' or po.status == 'partial' %}<th>Receive now</th>{% endif %}<th class="right">Unit cost</th><th class="right">{% tr "Total" %}</th></tr></thead><tbody>
+{% for l in lines %}<tr><td>{{ l.ingredient.name }}</td><td>{{ l.qty|num }} {{ l.ingredient.unit }}</td><td>{{ l.received_qty|num }}</td><td>{% if l.pending_qty %}<span class="badge b-amber">{{ l.pending_qty|num }}</span>{% else %}<span class="badge b-green">done</span>{% endif %}</td>
+  {% if po.status == 'ordered' or po.status == 'partial' %}<td>{% if l.pending_qty %}<input class="input" type="number" step="0.001" min="0" max="{{ l.pending_qty|stringformat:'s' }}" name="recv_{{ l.pk }}" value="{{ l.pending_qty|stringformat:'s' }}" style="width:110px;padding:5px 8px">{% endif %}</td>{% endif %}
+  <td class="right">{{ l.unit_cost|money:po.branch }}</td><td class="right">{{ l.line_total|money:po.branch }}</td></tr>{% endfor %}
+<tr><td colspan="{% if po.status == 'ordered' or po.status == 'partial' %}6{% else %}5{% endif %}" class="right"><b>{% tr "Total" %}</b></td><td class="right"><b>{{ po.total|money:po.branch }}</b></td></tr>
+</tbody></table></div>
+{% if po.invoice_no %}<p class="small muted" style="margin-top:8px">Supplier invoice: <b>{{ po.invoice_no }}</b></p>{% endif %}
+{% if po.status == 'ordered' or po.status == 'partial' %}
+<div class="row" style="margin-top:16px"><input class="input" name="invoice_no" placeholder="Supplier invoice / challan no." style="max-width:260px" value="{{ po.invoice_no }}">
+  <button class="btn green">{% icon 'check' 16 %} {% tr "Receive" %} goods (GRN)</button>
+  <span class="small muted">Lower the quantities for a partial delivery — the rest stays pending.</span></div>{% endif %}
+</form>
+{% if po.status == 'draft' %}
+<div class="row" style="margin-top:16px">
+  <form method="post" action="{% url 'po_action' po.pk %}">{% csrf_token %}<input type="hidden" name="action" value="send"><button class="btn primary">{% icon 'arrow' 16 %} Approve &amp; send to supplier</button></form>
+  <form method="post" action="{% url 'po_action' po.pk %}">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="btn danger" data-confirm="Cancel this PO?">{% tr "Cancel" %}</button></form>
+</div>{% elif po.status == 'ordered' %}
+<div class="row" style="margin-top:10px"><form method="post" action="{% url 'po_action' po.pk %}">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="btn danger sm" data-confirm="Cancel this PO?">{% tr "Cancel" %}</button></form></div>{% endif %}
+{% endblock %}

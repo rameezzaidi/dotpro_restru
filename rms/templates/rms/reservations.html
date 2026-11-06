@@ -1,0 +1,20 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Reservations</h1><p>{{ day|date:"l, d M Y" }}</p></div>
+  <div class="row"><a class="btn" href="?date={{ prev }}">←</a><a class="btn" href="?date={% now 'Y-m-d' %}">Today</a><a class="btn" href="?date={{ next }}">→</a></div></div>
+{% if request.branch %}
+<div class="card" style="margin-bottom:16px"><div class="card-b"><form method="post" class="row" style="flex-wrap:wrap">{% csrf_token %}
+  <input class="input" name="name" placeholder="Guest name" required style="max-width:180px"><input class="input" name="phone" placeholder="Phone" style="max-width:150px">
+  <input class="input" type="number" min="1" name="guests" value="2" title="Guests" style="max-width:80px">
+  <input class="input" type="datetime-local" name="at" value="{{ default_at }}" required>
+  <select class="input" name="table" style="max-width:190px"><option value="">Table (optional)</option>{% for t in tables %}<option value="{{ t.pk }}">{{ t.name }} · {{ t.area }} · {{ t.capacity }} seats</option>{% endfor %}</select>
+  <input class="input" name="notes" placeholder="Notes" style="max-width:200px"><button class="btn primary">{% icon 'plus' 16 %} Book</button></form></div></div>
+{% else %}<div class="msg warning" style="margin-bottom:14px">Select a branch from the top bar to add reservations.</div>{% endif %}
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Time</th><th>Guest</th><th>Guests</th><th>Table</th>{% if branch_all %}<th>{% tr "Branches" %}</th>{% endif %}<th>{% tr "Status" %}</th><th></th></tr></thead><tbody>
+{% for r in items %}<tr><td><b>{{ r.at|date:"H:i" }}</b></td><td>{{ r.name }}<div class="small muted">{{ r.phone }} {{ r.notes }}</div></td><td>{{ r.guests }}</td><td>{{ r.table.name|default:"—" }}</td>
+  {% if branch_all %}<td>{{ r.branch.code }}</td>{% endif %}
+  <td><span class="badge {% if r.status == 'booked' %}b-blue{% elif r.status == 'seated' %}b-green{% else %}b-grey{% endif %}">{{ r.get_status_display }}</span></td>
+  <td class="right">{% if r.status == 'booked' %}<form method="post" action="{% url 'reservation_action' r.pk %}" class="row" style="justify-content:flex-end;gap:6px">{% csrf_token %}
+    <button class="btn sm primary" name="action" value="seat">Seat</button><button class="btn sm" name="action" value="no_show">No-show</button><button class="btn sm danger" name="action" value="cancel">Cancel</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">No reservations for this day.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

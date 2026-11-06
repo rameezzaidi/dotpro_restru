@@ -1,0 +1,80 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% tr "Dashboard" %}</h1>
+    <p>{% if branch_all %}{% tr "All branches" %}{% else %}{{ branch.name }}{% endif %} · {% now "l, j M Y" %}</p></div>
+  <div class="row">
+    {% if request.branch %}<a class="btn primary" href="{% url 'pos' %}">{% icon 'bag' 16 %} {% tr "POS" %}</a>{% endif %}
+    <a class="btn" href="{% url 'orders' %}?status=active">{% icon 'list' 16 %} {% tr "Open orders" %}</a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="card stat"><div class="lbl">{% tr "Orders today" %}</div><div class="val">{{ stats.orders }}</div></div>
+  {% if role != 'waiter' %}<div class="card stat"><div class="lbl">{% tr "Revenue today" %}</div>
+    <div class="val">{% if mixed %}<span style="font-size:17px">Per branch ↓</span>{% else %}{{ stats.revenue|money }}{% endif %}</div>
+    {% if mixed %}<div class="sub">Branches use different currencies</div>{% endif %}</div>{% endif %}
+  <div class="card stat"><div class="lbl">{% tr "Open orders" %}</div><div class="val">{{ stats.open }}</div></div>
+  <div class="card stat"><div class="lbl">{% tr "Tables" %}</div><div class="val">{{ stats.tables_busy }}<span class="muted" style="font-size:16px"> / {{ stats.tables_total }}</span></div><div class="sub">{% tr "Occupied" %}</div></div>
+  {% if is_mgr %}<div class="card stat"><div class="lbl">{% tr "Low stock" %}</div><div class="val">{{ stats.low }}</div></div>{% endif %}
+</div>
+
+{% if branch_rows %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-h"><h2>{% tr "Branches" %} — {% tr "Today" %}</h2><span class="small muted">Master view: all branches at a glance</span></div>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>{% tr "Branches" %}</th><th>{% tr "Orders" %}</th><th>{% tr "Open orders" %}</th><th class="right">{% tr "Sales" %}</th><th></th></tr></thead>
+  <tbody>{% for r in branch_rows %}<tr>
+    <td><b>{{ r.branch.name }}</b> {% if r.branch.is_master %}<span class="badge b-brand">{% tr "Master branch" %}</span>{% endif %}<div class="small muted">{{ r.branch.timezone }}</div></td>
+    <td>{{ r.n }}</td><td>{{ r.open }}</td><td class="right">{{ r.rev|money:r.branch }}</td>
+    <td class="right"><a class="btn sm" href="{% url 'switch_branch' r.branch.pk %}?next=/dashboard/">Open →</a></td></tr>{% endfor %}</tbody></table></div>
+</div>
+{% endif %}
+
+{% if low_fb %}<div class="card" style="margin-bottom:16px;border-color:var(--red)"><div class="card-h"><h2>{% icon 'alert' 18 %} Low customer ratings (last 3 days)</h2><a class="btn sm" href="{% url 'feedback' %}">All feedback</a></div><div class="card-b">
+  {% for x in low_fb %}<div class="row" style="justify-content:space-between;gap:12px;margin:6px 0"><span><a href="{% url 'order_detail' x.order_id %}"><b>{{ x.order.number }}</b></a>
+    <span class="small muted">{% if x.service_rating %}service {{ x.service_rating }}★{% endif %}{% for i in x.items.all %}{% if i.rating and i.rating <= 2 %} · {{ i.name }} {{ i.rating }}★{% if i.comment %} “{{ i.comment }}”{% endif %}{% endif %}{% endfor %}{% if x.comment %} “{{ x.comment }}”{% endif %}</span></span>
+    <span class="small muted">{{ x.created_at|date:"d M H:i" }}</span></div>{% endfor %}</div></div>{% endif %}
+{% if is_mgr %}<div class="cols">
+  <div class="card">
+    <div class="card-h"><h2>{% if mixed %}Orders{% else %}{% tr "Sales" %}{% endif %} — 7 days</h2></div>
+    <div class="card-b"><div class="bars">
+      {% for p in series %}<div class="bar"><b>{% if mixed %}{{ p.value }}{% else %}{{ p.value|floatformat:0 }}{% endif %}</b><i style="height:{{ p.pct }}%"></i><span>{{ p.label }}</span></div>{% endfor %}
+    </div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>{% tr "Type" %}</h2></div>
+    <div class="card-b">
+      {% for r in type_rows %}<div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line)">
+        <span>{{ r.label|t:lang }}</span><span><b>{{ r.n }}</b>{% if not mixed %} <span class="muted small">· {{ r.rev|money }}</span>{% endif %}</span></div>{% endfor %}
+      <h3 style="margin:16px 0 6px">{% tr "Source" %}</h3>
+      {% for r in by_source %}<div class="row" style="justify-content:space-between;padding:5px 0"><span>{{ r.source__name|default:"—" }}</span><b>{{ r.n }}</b></div>
+      {% empty %}<div class="muted small">No orders yet today.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endif %}
+<div class="cols eq">
+  <div class="card">
+    <div class="card-h"><h2>{% if role == 'waiter' %}My orders today{% else %}{% tr "Orders" %}{% endif %}</h2><a class="small" href="{% url 'orders' %}">All →</a></div>
+    <div class="tbl-wrap"><table class="tbl"><tbody>
+      {% for o in recent %}<tr><td><a href="{% url 'order_detail' o.pk %}"><b>{{ o.number }}</b></a><div class="small muted">{{ o.get_order_type_display }}{% if o.table %} · {{ o.table.name }}{% endif %}{% if branch_all %} · {{ o.branch.code }}{% endif %}</div></td>
+        <td>{% status_badge o %}</td><td class="right">{{ o.total|money:o.branch }}</td></tr>
+      {% empty %}<tr><td class="empty">No orders today yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  {% if is_mgr %}<div class="grid" style="display:grid;gap:16px">
+    <div class="card">
+      <div class="card-h"><h2>{% tr "Low stock" %}</h2><a class="small" href="{% url 'stock' %}?low=1">View →</a></div>
+      <div class="tbl-wrap"><table class="tbl"><tbody>
+        {% for s in low_stock %}<tr><td>{{ s.ingredient.name }}{% if branch_all %}<div class="small muted">{{ s.branch.code }}</div>{% endif %}</td><td class="right"><span class="badge b-red">{{ s.quantity|num }} {{ s.ingredient.unit }}</span></td></tr>
+        {% empty %}<tr><td class="empty">All stock levels are healthy.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Top items today</h2></div>
+      <div class="card-b">{% for i in top_items %}<div class="row" style="justify-content:space-between;padding:4px 0"><span>{{ i.name }}</span><b>× {{ i.q }}</b></div>{% empty %}<span class="muted small">—</span>{% endfor %}</div>
+    </div>
+  </div>{% endif %}
+</div>
+{% endblock %}

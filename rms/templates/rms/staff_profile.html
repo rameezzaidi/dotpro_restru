@@ -1,0 +1,67 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% if kind == "waiter" %}{{ p.display_name }}{% else %}{{ p.name }}{% endif %}</h1>
+  <p>{% if kind == "waiter" %}Waiter{% else %}Delivery rider{% endif %} · {{ pbranch.name }}{% if p.phone %} · {{ p.phone }}{% endif %}{% if kind == "rider" and p.vehicle %} · {{ p.vehicle }}{% endif %}
+  {% if rank %} · <span class="badge b-brand">Rank {{ rank }} of {{ of }}</span>{% endif %}</p></div>
+  {% if user.role != "waiter" %}<a class="btn no-print" href="{% url 'staff_perf' %}?from={{ f.from }}&to={{ f.to }}">← All staff</a>{% endif %}</div>
+<form method="get" class="filters"><div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div><button class="btn">{% icon 'search' 16 %}</button></form>
+
+<div class="stats">
+  <div class="card stat"><div class="lbl">{% if kind == "waiter" %}Tables served{% else %}Deliveries{% endif %}</div><div class="val">{% if kind == "waiter" %}{{ s.tables }}{% else %}{{ s.n }}{% endif %}</div><div class="sub">{{ s.n }} bill{{ s.n|pluralize }} completed{% if s.active %} · {{ s.active }} open now{% endif %}</div></div>
+  <div class="card stat"><div class="lbl">Hotel earned</div><div class="val">{{ s.revenue|money:pbranch }}</div><div class="sub">{{ s.earn_per_order|money:pbranch }} per order</div></div>
+  <div class="card stat"><div class="lbl">Gross profit</div><div class="val">{{ s.profit|money:pbranch }}</div><div class="sub">after ingredient cost {{ s.cost|money:pbranch }}</div></div>
+  <div class="card stat"><div class="lbl">Tips received</div><div class="val">{{ s.tips|money:pbranch }}</div><div class="sub">{{ s.tip_pct }}% of sales</div></div>
+</div>
+<div class="card" style="margin-top:12px"><div class="card-b row" style="justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <div><div class="small muted">TOTAL INCOME ({{ f.from }} → {{ f.to }})</div><div style="font-size:28px;font-weight:700">{{ s.total_income|money:pbranch }}</div></div>
+  <div class="small"><div>Salary (prorated): <b>{{ s.salary_part|money:pbranch }}</b></div><div>Commission {{ p.commission_percent|floatformat:"-2" }}%: <b>{{ s.commission|money:pbranch }}</b></div>
+    {% if kind == "rider" %}<div>Per-delivery pay: <b>{{ s.delivery_pay|money:pbranch }}</b></div>{% endif %}<div>Tips: <b>{{ s.tips|money:pbranch }}</b></div></div>
+  {% if user.role != "waiter" %}<a class="btn no-print" href="{% if kind == 'waiter' %}{% url 'waiters_edit' p.pk %}{% else %}{% url 'riders_edit' p.pk %}{% endif %}">Edit salary / commission</a>{% endif %}</div></div>
+<div class="stats" style="margin-top:12px">
+  <div class="card stat"><div class="lbl">Average bill</div><div class="val">{{ s.avg|money:pbranch }}</div></div>
+  <div class="card stat"><div class="lbl">Items sold</div><div class="val">{{ s.items }}</div></div>
+  {% if kind == "waiter" %}
+  <div class="card stat"><div class="lbl">Cancelled orders</div><div class="val">{{ s.cancelled }}</div><div class="sub">{{ s.voids }} voids handled</div></div>
+  {% else %}
+  <div class="card stat"><div class="lbl">Avg handover time</div><div class="val">{% if s.avg_minutes is not None %}{{ s.avg_minutes }} min{% else %}—{% endif %}</div><div class="sub">kitchen ready → delivered</div></div>
+  <div class="card stat"><div class="lbl">Delivery fees</div><div class="val">{{ s.fees|money:pbranch }}</div><div class="sub">{{ s.out }} on the road now</div></div>
+  {% endif %}
+  <div class="card stat"><div class="lbl">Best day</div><div class="val">{% if best_day %}{{ best_day.label }}{% else %}—{% endif %}</div>{% if best_day %}<div class="sub">{{ best_day.value|money:pbranch }} · {{ best_day.n }} bills</div>{% endif %}</div>
+</div>
+
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>Daily sales brought in</h2><span class="small muted">tips shown above the bar when received</span></div>
+  <div class="card-b"><div class="bars tight">{% for d in days %}<div class="bar" title="{{ d.label }}: {{ d.value|money:pbranch }} · {{ d.n }} bills · tips {{ d.tips|money:pbranch }}"><b>{% if d.n %}{{ d.value|floatformat:0 }}{% endif %}</b><i style="height:{{ d.pct }}%"></i><span>{{ d.label }}</span></div>{% endfor %}</div></div></div>
+
+{% if kind == "waiter" %}<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>{% icon 'table' 18 %} Earnings by table</h2><span class="small muted">what each table he served brought to the restaurant</span></div>
+<table class="tbl"><thead><tr><th>Table</th><th class="right">Times served</th><th>Hotel earned</th><th class="right">Tips</th><th class="right">Rating</th><th class="right">Last served</th></tr></thead><tbody>
+{% for t in tables %}<tr><td><b>{{ t.name }}</b><div class="small muted">{{ t.area }}</div></td><td class="right">{{ t.visits }}</td>
+<td style="min-width:170px"><b>{{ t.earned|money:pbranch }}</b><div class="meter"><i style="width:{{ t.pct }}%"></i></div></td><td class="right">{{ t.tips|money:pbranch }}</td>
+<td class="right">{% if t.rating %}{{ t.rating }} ★{% else %}—{% endif %}</td><td class="right small">{{ t.last|date:"d M, H:i" }}</td></tr>
+{% empty %}<tr><td colspan="6" class="empty">No tables served in this period.</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+
+<div class="cols eq" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h2>{% icon 'star' 18 %} Customer feedback</h2><span class="small muted">{{ fb.n }} form{{ fb.n|pluralize }}</span></div><div class="card-b">
+    {% if fb.rated %}<div class="row" style="gap:14px;align-items:baseline"><span style="font-size:30px;font-weight:700">{{ fb.avg }} ★</span><span class="muted small">{% if kind == "waiter" %}service{% else %}delivery{% endif %} rating from {{ fb.rated }} customers</span></div>
+      {% for c in fb.dist_rows %}<div class="row" style="gap:10px;margin:4px 0"><b style="width:26px">{{ c.star }}★</b><div class="meter" style="flex:1"><i style="width:{{ c.pct }}%"></i></div><span class="small muted" style="width:26px;text-align:right">{{ c.n }}</span></div>{% endfor %}
+      {% if fb.pos %}<div style="margin-top:10px">{% for t, n in fb.pos %}<span class="badge b-green">{{ t }} ×{{ n }}</span> {% endfor %}</div>{% endif %}
+      {% if fb.neg %}<div style="margin-top:6px">{% for t, n in fb.neg %}<span class="badge b-red">{{ t }} ×{{ n }}</span> {% endfor %}</div>{% endif %}
+    {% else %}<div class="muted">No customer ratings yet.</div>{% endif %}</div></div>
+  <div class="card tbl-wrap"><div class="card-h"><h2>What customers wrote</h2></div><table class="tbl"><tbody>
+    {% for x in fb.recent %}<tr><td><a href="{% url 'order_detail' x.order_id %}">{{ x.order.number }}</a><div class="small muted">{{ x.created_at|date:"d M" }}{% if x.order.table %} · {{ x.order.table.name }}{% endif %}</div></td><td>{{ x.service_rating|default:"—" }}★</td><td class="small">“{{ x.comment }}”</td></tr>
+    {% empty %}<tr><td class="empty">No comments.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>Daily breakdown</h2><span class="small muted">sales brought in and tips received, day by day</span></div>
+<table class="tbl"><thead><tr><th>Date</th><th class="right">Bills</th><th class="right">Sales brought in</th><th class="right">Tips</th></tr></thead><tbody>
+{% for d in days_rev %}<tr><td>{{ d.label }}</td><td class="right">{{ d.n }}</td><td class="right">{{ d.value|money:pbranch }}</td><td class="right">{{ d.tips|money:pbranch }}</td></tr>{% endfor %}
+<tr><td><b>Total</b></td><td class="right"><b>{{ s.n }}</b></td><td class="right"><b>{{ s.gross|money:pbranch }}</b></td><td class="right"><b>{{ s.tips|money:pbranch }}</b></td></tr></tbody></table></div>
+<div class="cols eq" style="margin-top:16px">
+  <div class="card tbl-wrap"><div class="card-h"><h2>Top items {% if kind == "waiter" %}sold{% else %}delivered{% endif %}</h2></div><table class="tbl"><tbody>
+    {% for i in top %}<tr><td>{{ i.name }}</td><td>× {{ i.q }}</td><td class="right">{{ i.rev|money:pbranch }}</td></tr>{% empty %}<tr><td class="empty">No sales in this period.</td></tr>{% endfor %}</tbody></table></div>
+  <div class="card tbl-wrap"><div class="card-h"><h2>Recent orders</h2></div><table class="tbl"><tbody>
+    {% for o in recent %}<tr><td><a href="{% url 'order_detail' o.pk %}">{{ o.number }}</a><div class="small muted">{{ o.created_at|date:"d M, H:i" }}{% if o.table %} · {{ o.table.name }}{% endif %}</div></td>
+      <td>{% status_badge o %}</td><td class="right">{{ o.total|money:pbranch }}{% if o.tip %}<div class="small muted">tip {{ o.tip|money:pbranch }}</div>{% endif %}</td></tr>
+    {% empty %}<tr><td class="empty">No orders yet.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<p class="small muted" style="margin-top:12px">Hotel earned = completed sales minus tax (service charge and delivery fee included). Gross profit = earned minus ingredient cost from recipes. Tips are what customers paid on top of the bill.</p>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Stock requests</h1><p>Requests from the kitchen. Approve to add the item to a draft purchase order for its default supplier.</p></div>
+  <a class="btn" href="{% url 'purchase_orders' %}">Purchase orders</a></div>
+<div class="card"><div class="card-h"><h2>Waiting for you <span class="badge b-amber">{{ pending|length }}</span></h2></div>
+<div class="tbl-wrap"><table class="tbl" data-plain><thead><tr><th>Branch</th><th>Ingredient</th><th>In stock</th><th>Qty</th><th>By</th><th>Note</th><th></th></tr></thead><tbody>
+{% for r in pending %}<tr><td>{{ r.branch.code }}</td><td><b>{{ r.ingredient.name }}</b>{% if r.urgent %} <span class="badge b-red">Urgent</span>{% endif %}<div class="small muted">{% if r.ingredient.default_supplier %}{{ r.ingredient.default_supplier.name }}{% else %}no default supplier{% endif %}</div></td>
+  <td class="muted">{{ r.have|num }} {{ r.ingredient.unit }}</td>
+  <td colspan="1"><form method="post" action="{% url 'stock_request_action' r.pk %}" style="display:flex;gap:6px;align-items:center">{% csrf_token %}
+    <input class="input" name="qty" type="number" step="0.001" value="{{ r.qty|num }}" style="width:100px"> {{ r.ingredient.unit }}
+    <input class="input" name="note" placeholder="Reply to chef (optional)" style="width:170px"></td>
+  <td>{{ r.requested_by.display_name|default:"-" }}<div class="small muted">{{ r.created_at|date:"d M H:i" }}</div></td><td>{{ r.note }}</td>
+  <td class="right nowrap"><button class="btn sm primary" name="action" value="approve">Approve</button> <button class="btn sm" name="action" value="reject">Reject</button></form></td></tr>
+{% empty %}<tr><td colspan="7" class="empty">No pending requests.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>History</h2></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Branches</th><th>Ingredients</th><th>Qty</th><th>Status</th><th>By</th><th>PO</th></tr></thead><tbody>
+{% for r in history %}<tr><td class="small muted nowrap">{{ r.created_at|date:"d M H:i" }}</td><td>{{ r.branch.code }}</td><td>{{ r.ingredient.name }}</td><td>{{ r.qty|num }} {{ r.ingredient.unit }}</td>
+ <td>{% if r.status == "approved" %}<span class="badge b-green">Approved</span>{% else %}<span class="badge b-red">Rejected</span>{% endif %}</td><td>{{ r.requested_by.display_name|default:"-" }}</td>
+ <td>{% if r.po %}<a href="{% url 'po_detail' r.po.pk %}">{{ r.po.number }}</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">Nothing yet.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

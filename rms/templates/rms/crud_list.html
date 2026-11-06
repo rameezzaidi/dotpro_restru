@@ -1,0 +1,45 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ title|t:lang }}</h1>{% if subtitle %}<p>{{ subtitle }}</p>{% endif %}</div>
+  <div class="row">
+    {% if searchable %}<form method="get" class="row"><input class="input" name="q" value="{{ q }}" placeholder="{% tr 'Search' %}…" style="width:200px"><button class="btn">{% icon 'search' 16 %}</button></form>{% endif %}
+    {% if extra_link %}<a class="btn" href="{{ extra_link.url }}">{{ extra_link.label }}</a>{% endif %}
+    <a class="btn primary" href="{{ add_url }}">{% icon 'plus' 16 %} {% tr "Add" %}</a>
+  </div>
+</div>
+<div class="card tbl-wrap">
+  {% if rows %}
+  <table class="tbl" data-nosearch>
+    <thead><tr>
+      {% for label, path, kind in columns %}{% if kind != 'branch' or branch_all %}<th>{{ label|t:lang }}</th>{% endif %}{% endfor %}
+      <th class="right">{% tr "Actions" %}</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        {% for label, path, kind in columns %}{% if kind != 'branch' or branch_all %}
+          <td>
+            {% with v=r.obj|attr:path %}
+              {% if kind == 'bool' %}{% if v %}<span class="badge b-green">Yes</span>{% else %}<span class="badge b-grey">No</span>{% endif %}
+              {% elif kind == 'money' %}{{ v|money }}
+              {% elif kind == 'num' %}{{ v|num }}
+              {% elif kind == 'badge' %}<span class="badge b-brand">{{ v }}</span>
+              {% elif v == 0 %}0
+              {% else %}{{ v|default_if_none:"—"|default:"—" }}{% endif %}
+            {% endwith %}
+          </td>
+        {% endif %}{% endfor %}
+        <td class="actions">
+          {% for a in r.actions %}<a class="btn sm" href="{{ a.url }}">{% icon a.icon 15 %} {{ a.label }}</a>{% endfor %}
+          <a class="btn sm" href="{% url edit_name r.obj.pk %}">{% icon 'edit' 15 %} {% tr "Edit" %}</a>
+          <form method="post" action="{% url delete_name r.obj.pk %}" style="display:inline">{% csrf_token %}
+            <button class="btn sm danger" data-confirm="Delete this record?">{% icon 'trash' 15 %}</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">Nothing here yet. Use “{% tr "Add" %}” to create the first record.</div>{% endif %}
+</div>
+{% endblock %}

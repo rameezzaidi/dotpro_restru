@@ -1,0 +1,9 @@
+<div style="display:grid;gap:8px;margin-top:10px">
+  <label class="small muted">Reason (required)</label>
+  <select name="reason" class="input" required><option value="">Select reason…</option>{% for r in reasons %}<option>{{ r }}</option>{% endfor %}</select>
+  <input name="reason_text" class="input" placeholder="Details (optional)">
+  {% if not can_manage %}
+  <div class="small muted" style="margin-top:4px">If the item is already in the kitchen or the bill has payments, a <b>manager</b> must approve:</div>
+  <div class="row" style="flex-wrap:nowrap"><input name="approver_user" class="input" placeholder="Manager username" autocomplete="off"><input name="approver_pass" type="password" class="input" placeholder="Password" autocomplete="new-password"></div>
+  {% endif %}
+</div>

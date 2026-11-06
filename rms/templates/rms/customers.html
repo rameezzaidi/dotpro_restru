@@ -1,0 +1,20 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Customers</h1><p>Created automatically from the phone number on every order · loyalty points &amp; visit history</p></div></div>
+<div class="stats">
+  <div class="card stat"><div class="lbl">Customers</div><div class="val">{{ stats.total }}</div></div>
+  <div class="card stat"><div class="lbl">Gold (15+ visits)</div><div class="val">{{ stats.vip }}</div></div>
+  <div class="card stat"><div class="lbl">Lapsed (30+ days)</div><div class="val">{{ stats.lapsed }}</div></div>
+  <div class="card stat"><div class="lbl">Points outstanding</div><div class="val">{{ stats.points }}</div></div>
+</div>
+<form method="get" class="filters" style="margin-top:14px"><div><label class="small muted">Search</label><br><input class="input" name="q" value="{{ q }}" placeholder="Name or phone"></div>
+  <div><label class="small muted">Segment</label><br><select class="input" name="seg" onchange="this.form.submit()"><option value="">All</option><option value="vip" {% if seg == "vip" %}selected{% endif %}>Gold / VIP</option><option value="lapsed" {% if seg == "lapsed" %}selected{% endif %}>Lapsed</option><option value="new" {% if seg == "new" %}selected{% endif %}>New (7 days)</option><option value="points" {% if seg == "points" %}selected{% endif %}>Has points</option></select></div>
+  <div><label class="small muted">Sort</label><br><select class="input" name="sort" onchange="this.form.submit()"><option value="">Last visit</option><option value="spent" {% if sort == "spent" %}selected{% endif %}>Total spent</option><option value="visits" {% if sort == "visits" %}selected{% endif %}>Visits</option><option value="points" {% if sort == "points" %}selected{% endif %}>Points</option></select></div>
+  <button class="btn">{% icon 'search' 16 %}</button></form>
+<div class="card tbl-wrap"><table class="tbl" data-server="1"><thead><tr><th>Customer</th><th>Tier</th><th class="right">Visits</th><th class="right" data-sum>Total spent</th><th class="right" data-sum>Points</th><th class="right">Last visit</th></tr></thead><tbody>
+{% for c in page %}<tr><td><a href="{% url 'customer_detail' c.pk %}"><b>{{ c.name|default:"(no name)" }}</b></a><div class="small muted">{{ c.phone }}</div></td>
+<td><span class="badge {% if c.tier == 'Gold' %}b-amber{% elif c.tier == 'Silver' %}b-grey{% else %}b-brand{% endif %}">{{ c.tier }}</span></td>
+<td class="right">{{ c.visits }}</td><td class="right">{{ c.total_spent|money }}</td><td class="right"><b>{{ c.points }}</b></td><td class="right small">{% if c.last_visit %}{{ c.last_visit|date:"d M Y" }}{% else %}—{% endif %}</td></tr>
+{% empty %}<tr><td colspan="6" class="empty">No customers yet. Type a phone number on the next order.</td></tr>{% endfor %}</tbody></table></div>
+{% if page.has_other_pages %}<div class="row" style="margin-top:12px;gap:8px">{% if page.has_previous %}<a class="btn sm" href="?page={{ page.previous_page_number }}&q={{ q }}&seg={{ seg }}&sort={{ sort }}">← Prev</a>{% endif %}<span class="muted small">Page {{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="btn sm" href="?page={{ page.next_page_number }}&q={{ q }}&seg={{ seg }}&sort={{ sort }}">Next →</a>{% endif %}</div>{% endif %}
+{% endblock %}

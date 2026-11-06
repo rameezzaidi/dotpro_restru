@@ -1,0 +1,48 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>AI Insights &amp; Forecast</h1><p>Sales prediction, ingredient run-out, peak hours and advice · {{ abranch.name }} ({{ abranch.currency_code }}) · learned from {{ ai.days_of_data }} days of sales</p></div></div>
+{% if picker %}<form method="get" class="filters"><div><label class="small muted">Branch</label><br><select class="input" name="b" onchange="this.form.submit()">{% for b in picker %}<option value="{{ b.pk }}" {% if b.pk == abranch.pk %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></div></form>{% endif %}
+
+{% if not ai.days_of_data %}<div class="card"><div class="card-b empty">Not enough completed sales yet. Forecasts appear after a few days of orders.</div></div>{% else %}
+<div class="stats">
+  <div class="card stat"><div class="lbl">Tomorrow (expected)</div><div class="val">{{ ai.tomorrow.value|money:abranch }}</div><div class="sub">range {{ ai.tomorrow.low|money:abranch }} – {{ ai.tomorrow.high|money:abranch }}</div></div>
+  <div class="card stat"><div class="lbl">Next 7 days</div><div class="val">{{ ai.week_total|money:abranch }}</div><div class="sub">≈ {{ ai.week_orders }} orders</div></div>
+  <div class="card stat"><div class="lbl">Confidence</div><div class="val">{{ ai.conf }}</div><div class="sub">{% if ai.accuracy is not None %}back-test accuracy {{ ai.accuracy }}%{% else %}needs 3+ weeks to back-test{% endif %}</div></div>
+</div>
+
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>{% icon 'trend' 18 %} Sales: last 14 days and forecast</h2><span class="small muted">hatched bars = prediction (sales without tax)</span></div>
+  <div class="card-b"><div class="bars tight">{% for b in ai.bars %}<div class="bar" title="{{ b.label }}: {{ b.value }}{% if b.fc %} (range {{ b.low }} – {{ b.high }}){% endif %}"><b>{{ b.value }}</b><i class="{% if b.fc %}fc{% endif %}" style="height:{{ b.pct }}%"></i><span>{{ b.label }}</span></div>{% endfor %}</div></div></div>
+
+<div class="cols eq" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h2>{% icon 'alert' 18 %} Insights</h2></div><div class="card-b">
+    {% for i in ai.insights %}<div class="insight {{ i.level }}"><span class="dot"></span><div><b>{{ i.title }}</b><span class="small">{{ i.text }}</span></div></div>{% empty %}<div class="muted">No insights yet.</div>{% endfor %}</div></div>
+  <div>
+    <div class="card"><div class="card-h"><h2>{% icon 'clock' 18 %} Busy hours (last 28 days)</h2></div><div class="card-b"><div class="hours">{% for h in ai.hours %}<div title="{{ h.n }} orders"><i style="height:{{ h.pct }}%"></i>{{ h.label }}</div>{% endfor %}</div></div></div>
+    <div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>{% icon 'flame' 18 %} Expected demand — next 7 days</h2></div>
+      <table class="tbl"><thead><tr><th>Item</th><th class="right">Last 28 days</th><th class="right">Next 7 days</th><th class="right">Per day</th></tr></thead><tbody>
+      {% for d in ai.demand %}<tr><td>{{ d.name }}</td><td class="right">{{ d.last28 }}</td><td class="right"><b>{{ d.next7 }}</b></td><td class="right">{{ d.daily }}</td></tr>{% empty %}<tr><td colspan="4" class="empty">No data.</td></tr>{% endfor %}</tbody></table></div>
+  </div>
+</div>
+
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>{% icon 'package' 18 %} Ingredient forecast &amp; purchase advice</h2><span class="small muted">expected use from the demand forecast vs stock on hand</span></div>
+<table class="tbl"><thead><tr><th>Ingredient</th><th class="right">In stock</th><th class="right">Needed (7 days)</th><th class="right">Per day</th><th>Cover</th><th class="right">Buy</th><th class="right">Est. cost</th></tr></thead><tbody>
+{% for r in ai.ing %}<tr><td><b>{{ r.name }}</b></td><td class="right">{{ r.stock|num }} {{ r.unit }}</td><td class="right">{{ r.need|floatformat:1 }} {{ r.unit }}</td><td class="right">{{ r.per_day|floatformat:1 }}</td>
+<td><span class="badge {% if r.status == 'order' %}b-red{% elif r.status == 'soon' %}b-amber{% else %}b-green{% endif %}">{% if r.cover >= 30 %}30+{% else %}{{ r.cover|floatformat:1 }}{% endif %} days</span></td>
+<td class="right">{% if r.short > 0 %}<b>{{ r.short|floatformat:1 }} {{ r.unit }}</b>{% else %}—{% endif %}</td><td class="right">{% if r.short > 0 %}{{ r.buy_cost|money:abranch }}{% else %}—{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">Add recipes and stock to see ingredient forecasts.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>Ask the AI advisor (optional)</h2><span class="small muted">sends only the numbers above to Claude · needs ANTHROPIC_API_KEY on the server</span></div>
+<div class="card-b"><div class="row" style="gap:10px;flex-wrap:wrap"><select class="input" id="ai-lang" style="width:auto"><option value="en">English</option><option value="ur">Roman Urdu</option></select>
+<button class="btn primary" id="ai-go" type="button">{% icon 'flame' 16 %} Get recommendations</button></div>
+<div id="ai-out" class="ai-box" style="margin-top:12px"></div></div></div>
+<script>
+document.getElementById("ai-go").onclick = async () => {
+  const out = document.getElementById("ai-out"); out.textContent = "Thinking…";
+  const fd = new FormData(); fd.append("lang", document.getElementById("ai-lang").value);
+  fd.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+  try { const r = await fetch(location.pathname + "ask/{% if picker %}?b={{ abranch.pk }}{% endif %}", {method: "POST", body: fd});
+    const j = await r.json(); out.textContent = j.text || j.error; } catch (e) { out.textContent = "Request failed."; }
+};
+</script>
+{% endif %}
+{% endblock %}

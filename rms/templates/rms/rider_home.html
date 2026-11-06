@@ -1,0 +1,21 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>My Deliveries</h1><p>{% if rider %}{{ rider.name }} · {{ rider.vehicle|default:"no vehicle set" }} · {{ rider.branch.name }}{% else %}No rider profile{% endif %}</p></div></div>
+{% if not rider %}<div class="card"><div class="card-b empty">Your login is not linked to a rider profile. Ask the manager to set your role to Delivery Rider and your branch.</div></div>{% else %}
+<div class="stats">
+  <div class="card stat"><div class="lbl">To pick up</div><div class="val">{{ todo|length }}</div></div>
+  <div class="card stat"><div class="lbl">On the way</div><div class="val">{{ road|length }}</div></div>
+  <div class="card stat"><div class="lbl">Delivered today</div><div class="val">{{ n_done }}</div></div>
+  <div class="card stat"><div class="lbl">Earned today</div><div class="val">{{ earn|money:branch }}</div><div class="sub">per delivery fee</div></div>
+  <div class="card stat"><div class="lbl">Cash collected today</div><div class="val">{{ cash|money:branch }}</div><div class="sub">hand over to the cashier</div></div>
+</div>
+
+<h2 style="margin:18px 0 8px">Ready for pick-up</h2>
+{% for o in todo %}{% include "rms/_rider_card.html" with act="pickup" label="Picked up" %}{% empty %}<div class="card"><div class="card-b empty">Nothing waiting. New deliveries appear here (and in the bell) when the kitchen marks them ready.</div></div>{% endfor %}
+<h2 style="margin:18px 0 8px">On the way</h2>
+{% for o in road %}{% include "rms/_rider_card.html" with act="deliver" label="Delivered &amp; cash collected" %}{% empty %}<div class="card"><div class="card-b empty">No delivery on the road.</div></div>{% endfor %}
+<div class="card tbl-wrap" style="margin-top:18px"><div class="card-h"><h2>Delivered today</h2></div>
+<table class="tbl" data-plain><thead><tr><th>Order</th><th>Customer</th><th class="right">Amount</th></tr></thead><tbody>
+{% for o in done %}<tr><td>{{ o.number }}</td><td>{{ o.customer_name|default:"-" }}</td><td class="right">{{ o.total|money:branch }}</td></tr>{% empty %}<tr><td colspan="3" class="empty">None yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endif %}
+{% endblock %}

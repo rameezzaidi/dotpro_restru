@@ -1,0 +1,54 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Customer Feedback</h1><p>Ratings per dish, waiter and rider with automatic AI analysis · {% if branch_all %}All branches{% else %}{{ branch.name }}{% endif %}</p></div></div>
+<form method="get" class="filters"><div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div><button class="btn">{% icon 'search' 16 %}</button></form>
+{% if not a.n %}<div class="card"><div class="card-b empty">No feedback in this period. Customers rate by scanning the QR code printed on every bill.</div></div>{% else %}
+<div class="stats">
+  <div class="card stat"><div class="lbl">Service rating</div><div class="val">{{ a.avg_service }} ★</div><div class="sub">{{ a.rated }} ratings</div></div>
+  <div class="card stat"><div class="lbl">Food rating</div><div class="val">{{ a.avg_food }} ★</div><div class="sub">across all dishes</div></div>
+  <div class="card stat"><div class="lbl">Satisfied (4–5★)</div><div class="val">{% if a.csat is not None %}{{ a.csat }}%{% else %}—{% endif %}</div><div class="sub">{{ a.n }} forms{% if a.response_rate is not None %} · {{ a.response_rate }}% of orders{% endif %}</div></div>
+  <div class="card stat"><div class="lbl">Sentiment</div><div class="val" style="font-size:18px"><span class="badge b-green">{{ a.sentiment.pos }} positive</span> <span class="badge b-grey">{{ a.sentiment.neu }} neutral</span> <span class="badge b-red">{{ a.sentiment.neg }} negative</span></div></div>
+</div>
+
+<div class="cols eq" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h2>{% icon 'flame' 18 %} AI analysis <span class="small muted">(automatic)</span></h2></div><div class="card-b">
+    {% for i in a.insights %}<div class="insight {{ i.level }}"><span class="dot"></span><div><b>{{ i.title }}</b><span class="small">{{ i.text }}</span></div></div>{% empty %}<div class="muted">Not enough feedback to analyse yet.</div>{% endfor %}
+    <hr><div class="row" style="gap:10px;flex-wrap:wrap"><select class="input" id="fb-lang" style="width:auto"><option value="en">English</option><option value="ur">Roman Urdu</option></select>
+      <button class="btn" id="fb-go" type="button">Deeper AI report (Claude)</button></div><div id="fb-out" class="ai-box small" style="margin-top:10px"></div></div></div>
+  <div>
+    <div class="card"><div class="card-h"><h2>Rating spread</h2></div><div class="card-b">
+      {% for d in a.dist_rows %}<div class="row" style="gap:10px;margin:6px 0"><b style="width:28px">{{ d.star }}★</b><div class="meter" style="flex:1"><i style="width:{{ d.pct }}%"></i></div><span class="small muted" style="width:34px;text-align:right">{{ d.n }}</span></div>{% endfor %}</div></div>
+    <div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>What customers talk about</h2></div><table class="tbl"><tbody>
+      {% for t in a.themes %}<tr><td><b>{{ t.label }}</b>{% if t.samples %}<div class="small muted">“{{ t.samples.0 }}”</div>{% endif %}</td><td class="right"><span class="badge b-green">{{ t.pos }} +</span> <span class="badge b-red">{{ t.neg }} −</span></td></tr>
+      {% empty %}<tr><td class="empty">No comments yet.</td></tr>{% endfor %}</tbody></table></div>
+  </div>
+</div>
+
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>{% icon 'star' 18 %} Rating per item</h2><span class="small muted">lowest first</span></div>
+<table class="tbl"><thead><tr><th>Item</th><th>Rating</th><th class="right">Reviews</th><th>Complaints</th><th>Praised for</th><th>Latest comments</th></tr></thead><tbody>
+{% for r in a.items %}<tr><td><b>{{ r.name }}</b></td>
+<td><span class="badge {% if r.avg >= 4.2 %}b-green{% elif r.avg >= 3.5 %}b-amber{% else %}b-red{% endif %}">{{ r.avg }} ★</span></td><td class="right">{{ r.n }}{% if r.low %}<div class="small muted">{{ r.low }} low</div>{% endif %}</td>
+<td class="small">{% for t, n in r.neg %}<span class="badge b-red">{{ t }} ×{{ n }}</span> {% empty %}—{% endfor %}</td>
+<td class="small">{% for t, n in r.pos %}<span class="badge b-green">{{ t }} ×{{ n }}</span> {% empty %}—{% endfor %}</td>
+<td class="small">{% for rt, c, d in r.comments %}<div class="muted">{{ rt }}★ “{{ c }}”</div>{% empty %}—{% endfor %}</td></tr>{% empty %}<tr><td colspan="6" class="empty">No item ratings.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="cols eq" style="margin-top:16px">
+  <div class="card tbl-wrap"><div class="card-h"><h2>Waiters</h2></div><table class="tbl"><tbody>
+    {% for w in a.waiters %}<tr><td><a href="{% url 'waiter_profile' w.p.pk %}"><b>{{ w.p.display_name }}</b></a> <span class="small muted">{{ w.p.branch.code }}</span></td><td class="right"><span class="badge {% if w.avg >= 4.2 %}b-green{% elif w.avg >= 3.6 %}b-amber{% else %}b-red{% endif %}">{{ w.avg }} ★</span></td><td class="right small muted">{{ w.n }} ratings</td></tr>{% empty %}<tr><td class="empty">No waiter ratings.</td></tr>{% endfor %}</tbody></table></div>
+  <div class="card tbl-wrap"><div class="card-h"><h2>Riders</h2></div><table class="tbl"><tbody>
+    {% for w in a.riders %}<tr><td><a href="{% url 'rider_profile' w.p.pk %}"><b>{{ w.p.name }}</b></a> <span class="small muted">{{ w.p.branch.code }}</span></td><td class="right"><span class="badge {% if w.avg >= 4.2 %}b-green{% elif w.avg >= 3.6 %}b-amber{% else %}b-red{% endif %}">{{ w.avg }} ★</span></td><td class="right small muted">{{ w.n }} ratings</td></tr>{% empty %}<tr><td class="empty">No rider ratings.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+<div class="card tbl-wrap" style="margin-top:16px"><div class="card-h"><h2>Needs attention (low ratings)</h2></div><table class="tbl"><tbody>
+{% for x in a.low %}<tr><td><a href="{% url 'order_detail' x.order_id %}">{{ x.order.number }}</a><div class="small muted">{{ x.created_at|date:"d M, H:i" }}</div></td><td>{{ x.service_rating|default:"—" }}★ service{% if x.food_avg %} · {{ x.food_avg|floatformat:1 }}★ food{% endif %}</td>
+<td class="small">{% if x.comment %}“{{ x.comment }}”{% endif %}{% for i in x.items.all %}{% if i.comment and i.rating and i.rating <= 2 %}<div class="muted">{{ i.name }}: “{{ i.comment }}”</div>{% endif %}{% endfor %}</td></tr>{% empty %}<tr><td class="empty">Nothing urgent. 🎉</td></tr>{% endfor %}</tbody></table></div>
+<script>
+document.getElementById("fb-go").onclick = async () => {
+  const out = document.getElementById("fb-out"); out.textContent = "Thinking…";
+  const fd = new FormData(); fd.append("lang", document.getElementById("fb-lang").value); fd.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+  try { const r = await fetch("{% url 'feedback_ask' %}" + location.search, {method: "POST", body: fd}); const j = await r.json(); out.textContent = j.text || j.error; } catch (e) { out.textContent = "Request failed."; }
+};
+</script>
+{% endif %}
+{% endblock %}

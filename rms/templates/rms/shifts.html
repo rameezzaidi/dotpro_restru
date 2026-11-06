@@ -1,0 +1,32 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Cashier shifts</h1><p>Open your till with the opening cash, take payments, then close with the cash you counted.</p></div></div>
+{% if request.branch %}
+<div class="card" style="margin-bottom:18px"><div class="card-b">
+{% if mine %}
+  <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><b>Your shift is open</b> <span class="badge b-green">since {{ mine.opened_at|date:"d M, H:i" }}</span>
+    <div class="small muted">Opening cash {{ mine.opening_cash|money:mine.branch }} · {{ mine_totals.count }} orders · cash in drawer should be <b>{{ mine.opening_cash|add:mine_totals.cash_in|money:mine.branch }}</b></div></div></div>
+  <form method="post" action="{% url 'shift_action' %}" class="row" style="margin-top:12px;flex-wrap:wrap">{% csrf_token %}
+    <input type="hidden" name="action" value="close"><input type="hidden" name="shift" value="{{ mine.pk }}">
+    <input class="input" type="number" step="0.01" min="0" name="counted_cash" placeholder="Cash counted in drawer" required style="max-width:220px">
+    <input class="input" name="note" placeholder="Note (optional)" style="max-width:260px">
+    <button class="btn danger" data-confirm="Close your shift now?">Close shift</button></form>
+{% else %}
+  <form method="post" action="{% url 'shift_action' %}" class="row" style="flex-wrap:wrap">{% csrf_token %}
+    <input type="hidden" name="action" value="open"><b>Start shift</b>
+    <input class="input" type="number" step="0.01" min="0" name="opening_cash" placeholder="Opening cash in drawer" value="0" style="max-width:220px">
+    <button class="btn primary">{% icon 'check' 16 %} Open shift</button></form>
+{% endif %}
+</div></div>
+{% endif %}
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Cashier</th>{% if branch_all %}<th>{% tr "Branches" %}</th>{% endif %}<th>Opened</th><th>Closed</th><th class="right">Opening</th><th class="right">Expected</th><th class="right">Counted</th><th class="right">Difference</th><th></th></tr></thead><tbody>
+{% for s in shifts %}<tr><td>{{ s.pk }}</td><td>{{ s.user.display_name }}</td>{% if branch_all %}<td>{{ s.branch.code }}</td>{% endif %}
+  <td class="small nowrap">{{ s.opened_at|date:"d M, H:i" }}</td><td class="small nowrap">{% if s.closed_at %}{{ s.closed_at|date:"d M, H:i" }}{% else %}<span class="badge b-green">open</span>{% endif %}</td>
+  <td class="right">{{ s.opening_cash|money:s.branch }}</td>
+  <td class="right">{% if s.expected_cash is not None %}{{ s.expected_cash|money:s.branch }}{% else %}—{% endif %}</td>
+  <td class="right">{% if s.counted_cash is not None %}{{ s.counted_cash|money:s.branch }}{% else %}—{% endif %}</td>
+  <td class="right">{% if s.difference is not None %}<span class="badge {% if s.difference == 0 %}b-green{% elif s.difference < 0 %}b-red{% else %}b-amber{% endif %}">{{ s.difference|money:s.branch }}</span>{% else %}—{% endif %}</td>
+  <td class="right"><a class="btn sm" href="{% url 'shift_report' s.pk %}">Report</a></td></tr>
+{% empty %}<tr><td colspan="10" class="empty">No shifts yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,221 @@
+{% extends "rms/base.html" %}{% load rms_tags static %}
+{% block content %}
+{% csrf_token %}
+{% if low_list %}<div class="low-banner">{% icon 'alert' 15 %} <b>{{ low_list|length }} ingredient{{ low_list|length|pluralize }} low:</b>
+  {% for s in low_list|slice:":6" %}<span>{{ s.ingredient.name }} ({% if s.quantity <= 0 %}out{% else %}{{ s.quantity|num }} {{ s.ingredient.unit }}{% endif %}){% if not forloop.last %},{% endif %}</span>{% endfor %}
+  {% if low_list|length > 6 %}… {% endif %}<a href="{% url 'stock' %}?low=1">View stock</a></div>{% endif %}
+{% if add_order %}<div class="add-banner">Adding items to <b>{{ add_order.number }}</b>{% if add_order.table %} · Table {{ add_order.table.name }}{% endif %} — they go to the kitchen as <b>KOT round {% if add_order.status == 'new' %}{{ add_order.kot_round }}{% else %}{{ add_order.kot_round|add:1 }}{% endif %}</b>. <a href="{% url 'order_detail' add_order.pk %}">Cancel</a></div>{% endif %}
+<div class="pos">
+  <section class="pos-menu">
+    <div class="row" style="margin-bottom:10px">
+      <input id="q" class="input" placeholder="{% tr 'Search' %}…" style="max-width:260px">
+      <span class="muted small">{{ branch.name }} · {{ branch.currency_code }}</span>
+    </div>
+    <div class="ai-order"><input id="ai-text" class="input" placeholder="✨ AI order: &quot;2 zinger burger aur 1 coke&quot; (English / Roman Urdu)"><button type="button" class="btn" id="ai-go">AI add</button></div>
+    <div class="ai-line" id="ai-out"></div>
+    <div class="cats" id="cats">
+      <button class="cat active" data-cat="0">All</button>
+      {% for c in categories %}<button class="cat" data-cat="{{ c.id }}">{{ c.name }}</button>{% endfor %}
+    </div>
+    <div class="items" id="items"></div>
+  </section>
+
+  <aside class="card cart">
+    {% if not add_order %}<div class="card-h" style="padding:12px"><div class="seg" style="width:100%">
+      <button type="button" data-type="dine_in" class="on">{% tr "Dine-in" %}</button>
+      <button type="button" data-type="takeaway">{% tr "Takeaway" %}</button>
+      <button type="button" data-type="delivery">{% tr "Delivery" %}</button>
+    </div></div>{% endif %}
+
+    <div class="cart-opts" {% if add_order %}style="display:none"{% endif %}>
+      <div id="o-dine">
+        <div class="row" style="flex-wrap:nowrap">
+          <select id="table" class="input"><option value="">{% tr "Table" %}…</option>
+            {% for t in tables %}<option value="{{ t.id }}" {% if preselect_table == t.id|stringformat:"s" %}selected{% endif %}>{{ t.name }} · {{ t.area }}{% if t.status != 'free' %} ({{ t.get_status_display }}){% endif %}</option>{% endfor %}
+          </select>
+          {% if request.user.role != 'waiter' %}
+          <select id="waiter" class="input"><option value="">{% tr "Waiter" %}…</option>
+            {% for w in waiters %}<option value="{{ w.id }}">{{ w.display_name }}</option>{% endfor %}</select>{% endif %}
+        </div>
+      </div>
+      <div id="o-cust" class="hidden" style="display:grid;gap:8px">
+        <div class="row" style="flex-wrap:nowrap"><input id="cname" class="input" placeholder="{% tr 'Name' %}"><input id="cphone" class="input" placeholder="{% tr 'Phone' %}"></div>
+        <input id="caddr" class="input hidden" placeholder="{% tr 'Address' %}">
+        <select id="rider" class="input hidden"><option value="">{% tr "Rider" %} ({% tr "optional" %})</option>
+          {% for r in riders %}<option value="{{ r.id }}">{{ r.name }} · {{ r.get_status_display }}</option>{% endfor %}</select>
+      </div>
+      <div class="row" style="flex-wrap:nowrap">
+        <select id="source" class="input" title="{% tr 'Source' %}">
+          {% for c in channels %}<option value="{{ c.id }}" {% if c.code == 'pos' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+        <input id="notes" class="input" placeholder="{% tr 'Notes' %}">
+      </div>
+    </div>
+
+    <div class="cart-lines" id="lines"><div class="empty" style="padding:24px">{% tr "Cart" %} is empty</div></div>
+    <div class="ai-strip" id="ai-strip"></div>
+
+    <div class="totals">
+      <div class="t"><span>{% tr "Subtotal" %}</span><span id="t-sub">0</span></div>
+      <div class="t" {% if add_order %}style="display:none"{% endif %}><span>{% tr "Discount" %}</span><span><input id="disc" type="number" min="0" step="0.01" value="0" class="input" style="width:90px;padding:3px 8px;text-align:end"></span></div>
+      <div class="t" {% if add_order %}style="display:none"{% endif %}><span>{% tr "Promo code" %}</span><span><input id="coupon" class="input" placeholder="CODE" style="width:90px;padding:3px 8px;text-transform:uppercase"> <button type="button" class="btn sm" id="coupon-go">{% tr "Apply" %}</button></span></div>
+      <div class="t hidden" id="r-coupon"><span id="coupon-msg"></span><span id="t-coupon">0</span></div>
+      <div class="t" id="r-svc"><span>{% tr "Service charge" %} ({{ service }}%)</span><span id="t-svc">0</span></div>
+      <div class="t"><span>{% tr "Tax" %} ({{ tax }}%)</span><span id="t-tax">0</span></div>
+      <div class="t hidden" id="r-fee"><span>{% tr "Delivery fee" %}</span><span id="t-fee">0</span></div>
+      <div class="t grand"><span>{% tr "Total" %}</span><span id="t-total">0</span></div>
+      <div class="row" style="margin-top:10px;flex-wrap:nowrap">
+        <button class="btn {% if add_order %}primary{% endif %} block" id="btn-place">{% icon 'flame' 16 %} {% if add_order %}Send to kitchen{% else %}{% tr "Place order" %}{% endif %}</button>
+        {% if not add_order %}<button class="btn primary block" id="btn-pay">{% icon 'check' 16 %} {% tr "Pay now" %}</button>{% endif %}
+      </div>
+      <select id="method" class="input" style="margin-top:8px;{% if add_order %}display:none{% endif %}">
+        <option value="cash">{% tr "Cash" %}</option><option value="card">{% tr "Card" %}</option>
+        <option value="online">{% tr "Online" %}</option><option value="wallet">{% tr "Wallet" %}</option></select>
+    </div>
+  </aside>
+</div>
+
+{{ menu|json_script:"menu-data" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'rms/mods.js' %}"></script>
+<script src="{% static 'rms/ai.js' %}"></script>
+<script>
+(function () {
+  var MENU = JSON.parse(document.getElementById("menu-data").textContent);
+  var CFG = {tax: {{ tax }}, svc: {{ service }}, fee: {{ delivery_fee }}, sym: "{{ branch.currency_symbol|escapejs }}"};
+  var csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  var cart = {}, type = "dine_in", cat = 0, ADD_TYPE = "{{ add_order.order_type|default:"dine_in" }}", ADD_URL = {% if add_order %}"{% url 'order_add_items' add_order.pk %}"{% else %}""{% endif %};
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (n) { return CFG.sym + " " + n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+
+  function renderItems() {
+    var q = $("q").value.toLowerCase(), h = "";
+    MENU.forEach(function (m) {
+      if (cat && m.category !== cat) return;
+      if (q && m.name.toLowerCase().indexOf(q) < 0) return;
+      h += tileHTML(m, fmt(m.price), cartQty(cart, m.id));
+    });
+    $("items").innerHTML = h || '<div class="empty">No items</div>';
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
+
+  var couponAmt = 0;
+  function totals() {
+    var sub = 0; Object.values(cart).forEach(function (l) { sub += l.price * l.qty; });
+    var disc = Math.min(Math.max(parseFloat($("disc").value) || 0, 0) + couponAmt, sub);
+    var base = sub - disc, svc = type === "dine_in" ? base * CFG.svc / 100 : 0, tax = (base + svc) * CFG.tax / 100;
+    var fee = type === "delivery" ? CFG.fee : 0;
+    return {sub: sub, disc: disc, svc: svc, tax: tax, fee: fee, total: base + svc + tax + fee};
+  }
+  function renderCart() {
+    var ids = Object.keys(cart), h = "";
+    ids.forEach(function (id) {
+      var l = cart[id];
+      h += '<div class="cl"><div><b>' + esc(l.name) + '</b><div class="small muted">' + fmt(l.price) + '</div></div>' +
+        '<div class="qty"><button type="button" data-dec="' + id + '">−</button><span>' + l.qty + '</span><button type="button" data-inc="' + id + '">+</button></div>' +
+        '<b>' + fmt(l.price * l.qty) + '</b></div>';
+    });
+    $("lines").innerHTML = h || '<div class="empty" style="padding:24px">Cart is empty</div>';
+    var t = totals();
+    $("t-sub").textContent = fmt(t.sub); $("t-svc").textContent = fmt(t.svc); $("t-tax").textContent = fmt(t.tax);
+    $("t-fee").textContent = fmt(t.fee); $("t-total").textContent = fmt(t.total);
+    $("r-svc").classList.toggle("hidden", type !== "dine_in"); $("r-fee").classList.toggle("hidden", type !== "delivery");
+    tileBadges(cart);
+    if (window.AIUP) AIUP.refresh();
+  }
+  function setType(t) {
+    if (ADD_URL) { type = ADD_TYPE; renderCart(); return; }
+    type = t;
+    document.querySelectorAll(".seg button").forEach(function (b) { b.classList.toggle("on", b.dataset.type === t); });
+    $("o-dine").classList.toggle("hidden", t !== "dine_in");
+    $("o-cust").classList.toggle("hidden", t === "dine_in");
+    $("caddr").classList.toggle("hidden", t !== "delivery"); $("rider").classList.toggle("hidden", t !== "delivery");
+    renderCart();
+  }
+  if (!ADD_URL) $("o-cust").style.display = "";  // let .hidden control visibility
+  $("items").addEventListener("click", function (e) {
+    var b = e.target.closest(".tile"); if (!b) return;
+    var m = MENU.find(function (x) { return x.id == b.dataset.id; });
+    if (m.max_qty === 0) return;
+    if (m.mods && m.mods.length) { askMods(m, fmt, function (sel) { addLine(m, sel); }); return; }
+    addLine(m, null);
+  });
+  function addLine(m, sel) {
+    var have = cartQty(cart, m.id);
+    if (m.max_qty != null && have >= m.max_qty) { alert("Only " + m.max_qty + " portion(s) of " + m.name + " can be made from the current stock."); return; }
+    var line = cartAdd(cart, m, sel, 1);
+    if (m.low && m.low.length && !line.warned) {
+      line.warned = true;
+      toast("<b>⚠ Stock alert — " + esc(m.name) + "</b><br>" + m.low.map(function (x) {
+        return esc(x.name) + ": " + (x.out ? "<b>OUT</b>" : x.left + " " + esc(x.unit) + " left") + " (alert level " + x.level + ")"; }).join("<br>"), 7000);
+    }
+    renderCart();
+  }
+  $("lines").addEventListener("click", function (e) {
+    var inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]");
+    if (inc) { var mi = MENU.find(function (x) { return x.id == cart[inc.dataset.inc].mid; }); if (mi.max_qty != null && cartQty(cart, mi.id) >= mi.max_qty) { alert("No more stock for " + mi.name); return; } cart[inc.dataset.inc].qty++; }
+    if (dec) { var l = cart[dec.dataset.dec]; l.qty--; if (l.qty <= 0) delete cart[dec.dataset.dec]; }
+    renderCart();
+  });
+  $("cats").addEventListener("click", function (e) {
+    var b = e.target.closest(".cat"); if (!b) return;
+    document.querySelectorAll(".cat").forEach(function (x) { x.classList.remove("active"); }); b.classList.add("active");
+    cat = parseInt(b.dataset.cat); renderItems();
+  });
+  document.querySelectorAll(".seg button").forEach(function (b) { b.addEventListener("click", function () { setType(b.dataset.type); }); });
+  function couponOff(msg) { couponAmt = 0; $("r-coupon").classList.toggle("hidden", !msg); $("coupon-msg").textContent = msg || ""; $("t-coupon").textContent = ""; }
+  $("coupon-go").addEventListener("click", function () {
+    var sub = 0; Object.values(cart).forEach(function (l) { sub += l.price * l.qty; });
+    fetch("{% url 'coupon_check' %}", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify({code: $("coupon").value, subtotal: sub})})
+      .then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) { couponOff(d.error); return; }
+        couponAmt = d.amount; $("r-coupon").classList.remove("hidden"); $("coupon-msg").textContent = "Code " + d.code; $("t-coupon").textContent = "−" + fmt(d.amount); renderCart(); });
+  });
+  $("coupon").addEventListener("input", function () { if (couponAmt) { couponOff(""); renderCart(); } });
+  $("q").addEventListener("input", renderItems); $("disc").addEventListener("input", renderCart);
+
+  function submit(payNow) {
+    var items = cartItems(cart);
+    if (!items.length) { alert("Cart is empty"); return; }
+    if (ADD_URL) {
+      $("btn-place").disabled = true;
+      fetch(ADD_URL, {method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify({items: items})})
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (!d.ok) { $("btn-place").disabled = false; alert(d.error); return; } window.location = d.url; })
+        .catch(function () { $("btn-place").disabled = false; alert("Network error"); });
+      return;
+    }
+    var body = {order_type: type, items: items, table_id: $("table").value, waiter_id: $("waiter") ? $("waiter").value : "",
+      customer_name: $("cname").value, phone: $("cphone").value, address: $("caddr").value, rider_id: $("rider").value,
+      source_id: $("source").value, notes: $("notes").value, discount: $("disc").value || 0, coupon: $("coupon").value, pay_now: payNow, method: $("method").value};
+    $("btn-place").disabled = $("btn-pay").disabled = true;
+    fetch("{% url 'pos_submit' %}", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify(body)})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        $("btn-place").disabled = $("btn-pay").disabled = false;
+        if (!d.ok) { alert(d.error); return; }
+        if (payNow) { window.open(d.receipt, "_blank"); }
+        window.location = d.url;
+      }).catch(function () { $("btn-place").disabled = $("btn-pay").disabled = false; alert("Network error"); });
+  }
+  $("btn-place").addEventListener("click", function () { submit(false); });
+  if ($("btn-pay")) $("btn-pay").addEventListener("click", function () { submit(true); });
+
+  function addById(id, qty) {
+    var m = MENU.find(function (x) { return x.id == id; }); if (!m || m.max_qty === 0) return;
+    if (m.mods && m.mods.length) { askMods(m, fmt, function (sel) { addLine(m, sel); }); return; }
+    var have = cartQty(cart, m.id), add = qty || 1;
+    if (m.max_qty != null && have + add > m.max_qty) add = Math.max(0, m.max_qty - have);
+    if (!add) return;
+    cartAdd(cart, m, null, add);
+    renderCart();
+  }
+  RestoAI.order({input: "ai-text", button: "ai-go", output: "ai-out", url: "{% url 'ai_order' %}", csrf: function () { return csrf; },
+    add: function (l) { addById(l.id, l.qty); }});
+  window.AIUP = RestoAI.upsell({strip: "ai-strip", url: "{% url 'ai_upsell' %}", ids: function () { return Object.values(cart).map(function (l) { return l.mid; }); },
+    add: function (id) { addById(id, 1); }, fmt: fmt});
+  renderItems(); setType("dine_in");
+})();
+</script>
+{% endblock %}

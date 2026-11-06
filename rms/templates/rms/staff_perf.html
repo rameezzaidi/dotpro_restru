@@ -1,0 +1,21 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Staff Performance</h1><p>Tables, deliveries, what each person earned for the restaurant and the tips they received · {% if branch_all %}All branches{% else %}{{ branch.name }}{% endif %}</p></div></div>
+<form method="get" class="filters"><div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div><button class="btn">{% icon 'search' 16 %}</button></form>
+
+<div class="card tbl-wrap" style="margin-bottom:16px"><div class="card-h"><h2>{% icon 'user' 18 %} Waiters</h2><span class="small muted">Completed orders only · earned = sales without tax</span></div>
+<table class="tbl"><thead><tr><th>#</th><th>Waiter</th><th>Branch</th><th data-sum class="right">Tables served</th><th data-sum class="right">Bills</th><th class="right" data-sum>Hotel earned</th><th data-sum class="right">Gross profit</th><th class="right">Avg bill</th><th data-sum class="right">Tips</th><th data-sum class="right">Total income</th></tr></thead><tbody>
+{% for r in waiters %}<tr><td>{{ r.rank }}</td><td><a href="{% url 'waiter_profile' r.p.pk %}"><b>{{ r.p.display_name }}</b></a>{% if r.active %} <span class="badge b-amber">{{ r.active }} open</span>{% endif %}</td><td class="small">{{ r.branch.code }}</td>
+<td class="right">{{ r.tables }}</td><td class="right">{{ r.n }}</td>
+<td style="min-width:170px"><b>{{ r.revenue|money:r.branch }}</b><div class="meter"><i style="width:{{ r.pct }}%"></i></div></td>
+<td class="right">{{ r.profit|money:r.branch }}</td><td class="right">{{ r.avg|money:r.branch }}</td><td class="right"><b>{{ r.tips|money:r.branch }}</b></td><td class="right"><b>{{ r.income|money:r.branch }}</b></td></tr>
+{% empty %}<tr><td colspan="10" class="empty">No waiters.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="card tbl-wrap"><div class="card-h"><h2>{% icon 'bike' 18 %} Riders</h2><span class="small muted">Delivered orders only</span></div>
+<table class="tbl"><thead><tr><th>#</th><th>Rider</th><th>Branch</th><th data-sum class="right">Deliveries</th><th class="right" data-sum>Hotel earned</th><th data-sum class="right">Delivery fees</th><th class="right">Avg order</th><th data-sum class="right">Tips</th><th data-sum class="right">Total income</th></tr></thead><tbody>
+{% for r in riders %}<tr><td>{{ r.rank }}</td><td><a href="{% url 'rider_profile' r.p.pk %}"><b>{{ r.p.name }}</b></a>{% if r.active %} <span class="badge b-amber">{{ r.active }} open</span>{% endif %}</td><td class="small">{{ r.branch.code }}</td>
+<td class="right">{{ r.n }}</td><td style="min-width:170px"><b>{{ r.revenue|money:r.branch }}</b><div class="meter"><i style="width:{{ r.pct }}%"></i></div></td>
+<td class="right">{{ r.fees|money:r.branch }}</td><td class="right">{{ r.avg|money:r.branch }}</td><td class="right"><b>{{ r.tips|money:r.branch }}</b></td><td class="right"><b>{{ r.income|money:r.branch }}</b></td></tr>
+{% empty %}<tr><td colspan="9" class="empty">No riders.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

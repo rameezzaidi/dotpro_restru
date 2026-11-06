@@ -1,0 +1,27 @@
+{% load rms_tags %}
+<div class="kcard {{ mode }}">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div><b><a href="{% url 'order_detail' o.pk %}">{{ o.number }}</a></b>
+      <div class="small muted">{{ o.get_order_type_display|t:lang }}{% if o.table %} · {% tr "Table" %} {{ o.table.name }}{% endif %}{% if branch_all %} · {{ o.branch.code }}{% endif %}{% if o.source %} · {{ o.source.name }}{% endif %}</div></div>
+    {% if mode == "cook" %}<span class="timer big" data-since="{{ o.started_at|date:'c' }}" data-target="{{ o.target }}">00:00:00</span>
+    {% elif mode == "queue" %}<div class="right"><span class="badge b-blue">#{{ o.pos }} in queue</span><br><span class="timer" data-since="{{ o.created_at|date:'c' }}">00:00:00</span></div>
+    {% else %}<div class="right"><span class="timer ok" data-since="{{ o.ready_at|date:'c' }}">00:00:00</span><div class="small muted">waiting</div></div>{% endif %}
+  </div>
+  {% if o.kot_round > 1 %}<div class="small"><span class="badge b-amber">KOT {{ o.kot_round }} · add-on items</span></div>{% endif %}
+  <ul>{% for l in o.lines.all %}{% if not l.is_void %}<li {% if l.round < o.kot_round %}style="opacity:.45"{% endif %}>{% if l.round == o.kot_round and o.kot_round > 1 %}<b>NEW</b> {% endif %}{{ l.qty }} × {{ l.name }}{% if l.round < o.kot_round %} <small>(sent earlier)</small>{% endif %}{% if l.notes %}<small>{{ l.notes }}</small>{% endif %}</li>{% endif %}{% endfor %}</ul>
+  {% if o.notes %}<div class="small" style="color:var(--amber)">{% icon 'alert' 13 %} {{ o.notes }}</div>{% endif %}
+  {% if mode == "cook" %}
+  <form method="post" action="{% url 'order_action' o.pk %}" style="margin-top:10px">{% csrf_token %}
+    <input type="hidden" name="action" value="advance"><input type="hidden" name="next" value="{% url 'kitchen' %}">
+    <button class="btn green block big-btn">{% icon 'check' 18 %} Mark ready</button></form>
+  {% elif mode == "queue" and can_ctl %}
+  <form method="post" action="{% url 'order_action' o.pk %}" style="margin-top:10px">{% csrf_token %}
+    <input type="hidden" name="action" value="advance"><input type="hidden" name="next" value="{% url 'kitchen' %}">
+    <button class="btn sm" data-confirm="Skip the queue and start this order now?">Start now (override)</button></form>
+  {% elif mode == "ready" and can_ctl %}
+  <form method="post" action="{% url 'order_action' o.pk %}" style="margin-top:10px">{% csrf_token %}
+    <input type="hidden" name="action" value="advance"><input type="hidden" name="next" value="{% url 'kitchen' %}">
+    <button class="btn block">{% if o.order_type == 'delivery' %}Out for delivery{% elif o.order_type == 'dine_in' %}Served to table{% else %}Handed over / Complete{% endif %}</button></form>
+  {% endif %}
+  {% if mode != "queue" and o.chef %}<div class="small muted" style="margin-top:6px">{% icon 'user' 13 %} {{ o.chef.display_name }}</div>{% endif %}
+</div>

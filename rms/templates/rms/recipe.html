@@ -1,0 +1,63 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Recipe — {{ item.name }}</h1><p>{{ item.category.name }} · price {{ item.price|num }} · ingredients used for <b>1 portion</b>. They are checked and deducted from the branch stock whenever this dish is ordered.</p></div>
+  <div class="row"><a class="btn" href="{% url 'recipes' %}">← Recipes</a></div></div>
+<div class="cols">
+<form method="post" class="card"><div class="card-b">{% csrf_token %}
+  {% if copied %}<div class="msg warning" style="margin-bottom:10px">Loaded from <b>{{ src.name }}</b> — adjust quantities and press Save.</div>{% endif %}
+  <div class="row" style="justify-content:space-between;margin-bottom:10px"><b>Ingredients per portion</b>
+    {% if others %}<select class="input" style="max-width:220px" onchange="if(this.value)location='?copy='+this.value"><option value="">Copy from another dish…</option>{% for o in others %}<option value="{{ o.pk }}">{{ o.name }}</option>{% endfor %}</select>{% endif %}</div>
+  <div class="small muted" id="norecipe" style="margin-bottom:8px">{% if not lines %}No ingredients yet — add the first one below.{% endif %}</div>
+  <div id="lines">
+  {% for l in lines %}
+    <div class="row" data-row style="flex-wrap:nowrap;margin-bottom:8px">
+      <select class="input" name="ingredient" style="flex:3">{% for i in ingredients %}<option value="{{ i.pk }}" {% if i.pk == l.ingredient_id %}selected{% endif %}>{{ i.name }} ({{ i.unit }})</option>{% endfor %}</select>
+      <input class="input" name="qty" type="number" step="0.0001" min="0" value="{{ l.quantity|num }}" style="flex:1;min-width:90px">
+      <span class="unit small muted" style="min-width:34px"></span><span class="cost small" style="min-width:70px;text-align:end"></span>
+      <button type="button" class="btn sm danger" data-remove-row>{% icon 'x' 14 %}</button></div>
+  {% endfor %}
+  </div>
+  <template id="row-tpl"><div class="row" data-row style="flex-wrap:nowrap;margin-bottom:8px">
+      <select class="input" name="ingredient" style="flex:3">{% for i in ingredients %}<option value="{{ i.pk }}">{{ i.name }} ({{ i.unit }})</option>{% endfor %}</select>
+      <input class="input" name="qty" type="number" step="0.0001" min="0" placeholder="Qty" style="flex:1;min-width:90px">
+      <span class="unit small muted" style="min-width:34px"></span><span class="cost small" style="min-width:70px;text-align:end"></span>
+      <button type="button" class="btn sm danger" data-remove-row>{% icon 'x' 14 %}</button></div></template>
+  <button type="button" class="btn sm" data-add-row="row-tpl" data-target="lines">{% icon 'plus' 14 %} Add ingredient</button>
+  <div class="row" style="margin-top:18px"><button class="btn primary">{% icon 'check' 16 %} {% tr "Save" %} recipe</button></div>
+</div></form>
+
+<div style="display:grid;gap:16px;align-content:start">
+  <div class="card"><div class="card-h"><h2>Costing</h2></div><div class="card-b">
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>Selling price</span><b id="c-price" data-price="{{ item.price|stringformat:'s' }}">{{ item.price|num }}</b></div>
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>Ingredient cost / portion</span><b id="c-cost">0</b></div>
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>Margin</span><b id="c-margin">—</b></div>
+    <div class="row" style="justify-content:space-between;margin:6px 0"><span>Food cost %</span><span id="c-fc" class="badge b-grey">—</span></div>
+    <div class="small muted">Tip: a healthy food cost is usually 28–35% of the price.</div></div></div>
+  <div class="card"><div class="card-h"><h2>Can each branch make it?</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for a in avail %}<tr><td>{{ a.branch.name }}</td><td class="right">{% if a.max is None %}<span class="muted">no recipe saved</span>{% elif a.max == 0 %}<span class="badge b-red">Sold out</span> <span class="small muted">{{ a.limiting }}</span>
+      {% else %}<span class="badge {% if a.low %}b-amber{% else %}b-green{% endif %}">{{ a.max }} portions</span>{% if a.low %}<div class="small muted">low: {% for x in a.low %}{{ x.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+</div>
+{{ ing_json|json_script:"ing-data" }}
+{% endblock %}
+{% block scripts %}<script>
+(function () {
+  var D = JSON.parse(document.getElementById("ing-data").textContent), box = document.getElementById("lines");
+  function calc() {
+    var total = 0, rows = box.querySelectorAll("[data-row]");
+    rows.forEach(function (r) {
+      var sel = r.querySelector("select"), q = parseFloat(r.querySelector("[name=qty]").value) || 0, d = D[sel.value] || {unit: "", cost: 0};
+      r.querySelector(".unit").textContent = d.unit; var c = q * d.cost; total += c;
+      r.querySelector(".cost").textContent = c ? c.toFixed(2) : "";
+    });
+    var price = parseFloat(document.getElementById("c-price").dataset.price) || 0;
+    document.getElementById("c-cost").textContent = total.toFixed(2);
+    var m = document.getElementById("c-margin"), fc = document.getElementById("c-fc");
+    if (total > 0 && price > 0) { m.textContent = (price - total).toFixed(2); var p = total / price * 100; fc.textContent = p.toFixed(0) + "%";
+      fc.className = "badge " + (p > 40 ? "b-red" : p > 33 ? "b-amber" : "b-green"); } else { m.textContent = "—"; fc.textContent = "—"; fc.className = "badge b-grey"; }
+    document.getElementById("norecipe").textContent = rows.length ? "" : "No ingredients yet — add the first one below.";
+  }
+  box.addEventListener("input", calc); box.addEventListener("change", calc);
+  document.addEventListener("click", function () { setTimeout(calc, 30); }); calc();
+})();
+</script>{% endblock %}

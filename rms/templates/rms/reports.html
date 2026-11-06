@@ -1,0 +1,35 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{% tr "Reports" %}</h1><p>{% if branch_all %}{% tr "All branches" %}{% else %}{{ branch.name }}{% endif %}</p></div></div>
+<form method="get" class="filters"><div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div><button class="btn">{% icon 'search' 16 %}</button></form>
+{% if mixed %}<div class="msg warning" style="margin-bottom:14px">Your branches use different currencies, so amounts are shown per branch only. Other tables show order counts.</div>{% endif %}
+<div class="stats">
+  <div class="card stat"><div class="lbl">{% tr "Orders" %}</div><div class="val">{{ totals.n }}</div></div>
+  {% if not mixed %}
+  <div class="card stat"><div class="lbl">{% tr "Sales" %}</div><div class="val">{{ totals.rev|default:0|money }}</div></div>
+  <div class="card stat"><div class="lbl">{% tr "Tax" %}</div><div class="val">{{ totals.tax|default:0|money }}</div></div>
+  <div class="card stat"><div class="lbl">{% tr "Discount" %}</div><div class="val">{{ totals.disc|default:0|money }}</div></div>{% endif %}
+</div>
+<div class="cols eq">
+  <div class="card"><div class="card-h"><h2>{% tr "Branches" %}</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for r in by_branch %}<tr><td><b>{{ r.branch.name }}</b></td><td>{{ r.n }} orders</td><td class="right">{{ r.rev|money:r.branch }}</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-h"><h2>{% tr "Type" %}</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for r in by_type %}<tr><td>{{ r.label|t:lang }}</td><td>{{ r.n }}</td><td class="right">{% if not mixed %}{{ r.rev|money }}{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+<div class="cols eq">
+  <div class="card"><div class="card-h"><h2>{% tr "Source" %}</h2><span class="small muted">with app commission</span></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for r in by_source %}<tr><td>{{ r.label }}</td><td>{{ r.n }}</td><td class="right">{% if not mixed %}{{ r.rev|money }}{% if r.commission %}<div class="small muted">commission {{ r.commission|money }}</div>{% endif %}{% endif %}</td></tr>
+    {% empty %}<tr><td class="empty">No data</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-h"><h2>Top items</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for i in top_items %}<tr><td>{{ i.name }}</td><td>× {{ i.q }}</td><td class="right">{% if not mixed %}{{ i.rev|money }}{% endif %}</td></tr>{% empty %}<tr><td class="empty">No data</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+<div class="cols eq">
+  <div class="card"><div class="card-h"><h2>{% tr "Waiters" %}</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for w in waiters %}<tr><td>{{ w.waiter__first_name|default:w.waiter__username }}</td><td>{{ w.n }} orders</td><td class="right">{% if not mixed %}{{ w.rev|money }}{% endif %}</td></tr>{% empty %}<tr><td class="empty">No data</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-h"><h2>{% tr "Riders" %}</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for r in riders %}<tr><td>{{ r.rider__name }}</td><td class="right">{{ r.n }} deliveries</td></tr>{% empty %}<tr><td class="empty">No data</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>Daily</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+  {% for d in by_day %}<tr><td>{{ d.d|date:"D, d M Y" }}</td><td>{{ d.n }} orders</td><td class="right">{% if not mixed %}{{ d.rev|money }}{% endif %}</td></tr>{% empty %}<tr><td class="empty">No data</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

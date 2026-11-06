@@ -1,0 +1,26 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="{{ lang|default:'en' }}" dir="{{ lang_dir|default:'ltr' }}">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · {{ setting.business_name|default:"Restopro" }}</title>
+<link rel="stylesheet" href="{% static 'rms/app.css' %}">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#b4532a">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="brand" style="padding-bottom:6px"><span class="logo">{% icon 'store' 20 %}</span><span>{{ setting.business_name|default:"Restopro" }}</span></div>
+    <p class="muted" style="margin:0 0 22px">Restaurant management &amp; POS</p>
+    {% if locked %}<div class="msg error" style="margin-bottom:14px">Too many wrong passwords. Try again in {{ locked }} minute{{ locked|pluralize }}.</div>{% elif form.errors %}<div class="msg error" style="margin-bottom:14px">Wrong username or password.</div>{% endif %}
+    <form method="post">{% csrf_token %}
+      <div class="field"><label>{% tr "Username" %}</label>{{ form.username }}</div>
+      <div class="field"><label>{% tr "Password" %}</label>{{ form.password }}</div>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="btn primary block" type="submit">{% tr "Sign in" %}</button>
+    </form>
+    <p class="small muted" style="margin:18px 0 0;text-align:center"><a href="{% url 'site_branches' %}">Online ordering page →</a></p>
+  </div>
+</div>
+<script>document.querySelectorAll('#id_username,#id_password').forEach(function(e){e.className='input'});</script>
+</body>
+</html>

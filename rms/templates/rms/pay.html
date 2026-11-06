@@ -1,0 +1,15 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay · {{ o.branch.name }}</title><link rel="stylesheet" href="{% static 'rms/app.css' %}"></head>
+<body><div style="max-width:480px;margin:26px auto;padding:0 14px"><div class="card"><div class="card-b">
+  <div class="brand" style="justify-content:center">{{ o.branch.name }}</div>
+  <h2 style="text-align:center;margin:8px 0 2px">Order {{ o.number }}</h2>
+  {% if messages %}{% for m in messages %}<div class="msg warning">{{ m }}</div>{% endfor %}{% endif %}
+  <div class="tbl-wrap"><table class="tbl"><tbody>{% for l in o.lines.all %}{% if not l.is_void %}<tr><td>{{ l.qty }} × {{ l.name }}</td><td class="right">{{ l.line_total|money:o.branch }}</td></tr>{% endif %}{% endfor %}
+  <tr><td><b>Total</b></td><td class="right"><b>{{ o.total|money:o.branch }}</b></td></tr></tbody></table></div>
+  {% if link.status == "paid" %}<div class="msg success" style="margin-top:12px;text-align:center"><b>Payment received — thank you!</b><br>{{ link.amount|money:o.branch }}</div>
+  {% elif link.status == "failed" %}<div class="msg warning" style="margin-top:12px;text-align:center">Payment failed or cancelled.</div>
+  {% else %}<h3 style="text-align:center;margin:14px 0 6px">Amount due: {{ link.amount|money:o.branch }}</h3>
+    <form method="post" action="{% url 'pay_start' link.token %}">{% csrf_token %}<button class="btn primary" style="width:100%;min-height:48px">Pay now</button></form>
+    {% if link.provider == "sandbox" %}<p class="small muted" style="text-align:center">Test mode — no real money is charged.</p>{% endif %}{% endif %}
+</div></div></div></body></html>

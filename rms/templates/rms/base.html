@@ -1,0 +1,140 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="{{ lang }}" dir="{{ lang_dir }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ title|default:"Restopro" }}{% endblock %} · {{ setting.business_name|default:"Restopro" }}</title>
+<link rel="stylesheet" href="{% static 'rms/app.css' %}">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#b4532a"><link rel="apple-touch-icon" href="{% static 'rms/icon-192.png' %}">
+{% block head %}{% endblock %}
+</head>
+<body data-business="{{ setting.business_name|default:"Restopro" }}" data-branch="{% if branch_all %}All branches{% else %}{{ ctx_branch.name }}{% endif %}" data-user="{{ user.get_full_name|default:user.username }}">
+<div class="app">
+  <aside class="sidebar no-print">
+    <div class="brand"><span class="logo">{% icon 'store' 20 %}</span><span>{{ setting.business_name }}</span></div>
+    <nav class="nav">
+      {% for group, items in nav_groups %}
+        <div class="nav-group">{{ group|t:lang }}</div>
+        {% for n in items %}
+          <a href="{% url n.url %}" class="{% if n.active %}active{% endif %}">{% icon n.icon 18 %}<span>{{ n.label|t:lang }}</span></a>
+        {% endfor %}
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar no-print">
+      <button class="btn sm burger" data-burger aria-label="menu">{% icon 'menu' 18 %}</button>
+      <div class="grow"></div>
+
+      <div class="dd" id="bell">
+        <button class="pill-btn bell-btn" data-dd aria-label="Notifications">{% icon 'bell' 17 %}<span class="bell-n" id="bell-n" hidden>0</span></button>
+        <div class="menu bell-menu">
+          <div class="bell-h"><b>Notifications</b><button type="button" class="linkish" id="bell-all">Mark all read</button></div>
+          <div id="bell-list"><div class="small muted" style="padding:14px">No notifications yet.</div></div>
+        </div>
+      </div>
+
+      {% if switch_branches %}
+      <div class="dd">
+        <button class="pill-btn" data-dd>{% icon 'building' 16 %}
+          {% if branch_all %}{{ "All branches"|t:lang }}{% else %}{{ branch.name }}{% endif %}</button>
+        <div class="menu">
+          <a href="{% url 'switch_branch' 'all' %}?next={{ request.get_full_path|urlencode }}" class="{% if branch_all %}sel{% endif %}">{{ "All branches"|t:lang }}</a>
+          {% for b in switch_branches %}
+            <a href="{% url 'switch_branch' b.pk %}?next={{ request.get_full_path|urlencode }}" class="{% if branch and branch.pk == b.pk %}sel{% endif %}">{{ b.name }}{% if b.is_master %} ★{% endif %}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% elif branch %}
+        <span class="pill-btn" style="cursor:default">{% icon 'building' 16 %} {{ branch.name }}</span>
+      {% endif %}
+
+      {% if setting.language_selection_enabled %}
+      <div class="dd">
+        <button class="pill-btn" data-dd>{% icon 'globe' 16 %} {{ LANGS|getitem:lang|attr:"name" }}</button>
+        <div class="menu">
+          {% for code, l in LANGS.items %}<a href="{% url 'set_language' code %}" class="{% if code == lang %}sel{% endif %}">{{ l.name }}</a>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="dd">
+        <button class="pill-btn" data-dd>{% icon 'user' 16 %} {{ request.user.display_name }}</button>
+        <div class="menu">
+          <div class="small muted" style="padding:6px 12px">{{ request.user.get_role_display }}{% if request.user.can_access_all %} · {{ "Master branch"|t:lang }}{% endif %}</div>
+          <a class="btn sm block" style="border:0" href="{% url 'password_change' %}">{% icon 'shield' 16 %} {% tr "Change password" %}</a>
+          <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn sm block" style="border:0">{% icon 'logout' 16 %} {{ "Logout"|t:lang }}</button></form>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      {% if messages %}<div class="messages">{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{{ COUNTRIES|json_script:"countries-data" }}
+<script>window.COUNTRIES = JSON.parse(document.getElementById("countries-data").textContent);</script>
+<script src="{% static 'rms/app.js' %}"></script>
+<script src="{% static 'rms/report.js' %}"></script>
+{% block scripts %}{% endblock %}
+<div class="bell-toast" id="bell-toast" hidden></div>
+<script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js").catch(function () {}); }</script>
+{% if user.role == 'owner' or user.role == 'manager' %}
+<button class="copilot-fab no-print" id="cp-fab" type="button">✨ {% tr "Ask AI" %}</button>
+<div class="copilot no-print" id="cp">
+  <div class="copilot-h"><span>✨ AI Copilot</span><button type="button" class="linkish" id="cp-x">✕</button></div>
+  <div class="copilot-log" id="cp-log"><div class="cp-a">Assalam o Alaikum! Mujh se poochiye: "aaj ki sale kitni hai?", "kal kitni sale hogi?", "kaunsa stock kam hai?"</div></div>
+  <div class="copilot-sug" id="cp-sug"><button type="button">Aaj ki sale kitni hai?</button><button type="button">Kal ki forecast?</button><button type="button">Kaunsa stock kam hai?</button><button type="button">Top selling items?</button></div>
+  <form class="copilot-f" id="cp-form"><input class="input" id="cp-q" placeholder="Kuch bhi poochiye…" autocomplete="off"><button class="btn primary" type="submit">Send</button></form>
+</div>
+<script>
+(function () {
+  var cp = document.getElementById("cp"), log = document.getElementById("cp-log"), q = document.getElementById("cp-q");
+  var csrf = (document.querySelector("[name=csrfmiddlewaretoken]") || {}).value || "{{ csrf_token }}";
+  function add(cls, t) { var d = document.createElement("div"); d.className = cls; d.textContent = t; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; }
+  function ask(t) {
+    t = t.trim(); if (!t) return; add("cp-q", t); q.value = ""; var w = add("cp-a", "…");
+    var fd = new FormData(); fd.append("q", t);
+    fetch("{% url 'ai_copilot' %}" + location.search, {method: "POST", body: fd, credentials: "same-origin", headers: {"X-CSRFToken": csrf}})
+      .then(function (r) { return r.json(); }).then(function (d) { w.textContent = d.text || "No answer."; }).catch(function () { w.textContent = "Network error."; });
+  }
+  document.getElementById("cp-fab").onclick = function () { cp.classList.toggle("open"); if (cp.classList.contains("open")) q.focus(); };
+  document.getElementById("cp-x").onclick = function () { cp.classList.remove("open"); };
+  document.getElementById("cp-form").onsubmit = function (e) { e.preventDefault(); ask(q.value); };
+  document.getElementById("cp-sug").onclick = function (e) { if (e.target.tagName === "BUTTON") ask(e.target.textContent); };
+})();
+</script>
+{% endif %}
+<script>
+(function () {
+  var n = document.getElementById("bell-n"), list = document.getElementById("bell-list"), toast = document.getElementById("bell-toast");
+  var maxSeen = null, title0 = document.title, csrf = (document.querySelector("[name=csrfmiddlewaretoken]") || {}).value || "{{ csrf_token }}";
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
+  function beep() { try { var c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain();
+    o.connect(g); g.connect(c.destination); o.frequency.value = 660; g.gain.value = 0.07; o.start(); setTimeout(function () { o.frequency.value = 880; }, 140); setTimeout(function () { o.stop(); c.close(); }, 300); } catch (e) {} }
+  function post(data) { return fetch("{% url 'notif_read' %}", {method: "POST", credentials: "same-origin", headers: {"X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded"}, body: data}); }
+  function draw(d) {
+    n.hidden = !d.unread; n.textContent = d.unread > 9 ? "9+" : d.unread;
+    document.title = (d.unread ? "(" + d.unread + ") " : "") + title0.replace(/^\(\d+\) /, "");
+    list.innerHTML = d.items.length ? d.items.map(function (i) {
+      return '<a class="bell-i ' + i.kind + (i.read ? "" : " unread") + '" href="' + esc(i.url || "#") + '" data-id="' + i.id + '"><span class="dot"></span><span><b>' + esc(i.title) + '</b><span class="d">' + esc(i.body) + '</span><span class="t">' + esc(i.at) + '</span></span></a>';
+    }).join("") : '<div class="small muted" style="padding:14px">No notifications yet.</div>';
+    var newest = d.items.length ? d.items[0].id : 0;
+    if (maxSeen !== null && newest > maxSeen) {
+      var fresh = d.items.filter(function (i) { return i.id > maxSeen && !i.read; });
+      if (fresh.length) { beep(); toast.className = "bell-toast " + fresh[0].kind; toast.innerHTML = "<b>" + esc(fresh[0].title) + "</b><span>" + esc(fresh[0].body) + "</span>"; toast.hidden = false;
+        toast.onclick = function () { location.href = fresh[0].url || "#"; }; clearTimeout(toast._h); toast._h = setTimeout(function () { toast.hidden = true; }, 7000); }
+    }
+    maxSeen = Math.max(maxSeen || 0, newest);
+  }
+  function poll() { if (document.hidden) return; fetch("{% url 'notif_feed' %}", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(draw).catch(function () {}); }
+  list.addEventListener("click", function (e) { var a = e.target.closest(".bell-i"); if (a) post("id=" + a.dataset.id); });
+  document.getElementById("bell-all").addEventListener("click", function () { post("").then(poll); });
+  poll(); setInterval(poll, 6000); document.addEventListener("visibilitychange", poll);
+})();
+</script>
+</body>
+</html>

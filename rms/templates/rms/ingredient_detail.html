@@ -1,0 +1,31 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{{ ing.name }} <span class="badge b-grey">{{ ing.get_category_display }}</span></h1>
+  <p>Unit: {{ ing.unit }} · cost {{ ing.unit_cost|num }} per {{ ing.unit }}{% if ing.default_supplier %} · supplier {{ ing.default_supplier.name }}{% endif %} · used last 7 days: <b>{{ used_week|num }} {{ ing.unit }}</b></p></div>
+  <div class="row"><a class="btn" href="{% url 'ingredients_edit' ing.pk %}">{% icon 'edit' 16 %} Edit</a><a class="btn" href="{% url 'ingredients' %}">← Back</a></div></div>
+
+<div class="cols">
+  <div style="display:grid;gap:16px;align-content:start">
+    <div class="card"><div class="card-h"><h2>Stock by branch</h2></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>{% tr "Branches" %}</th><th>Stock</th><th>Alert level</th><th>Status</th></tr></thead><tbody>
+      {% for r in brows %}<tr><td>{{ r.branch.name }}</td><td><b>{{ r.stock.quantity|num|default:"0" }}</b> {{ ing.unit }}</td>
+        <td>{% if r.stock %}{{ r.stock.level|num }}{% else %}{{ ing.default_reorder_level|num }}{% endif %}</td>
+        <td>{% if r.status == 'out' %}<span class="badge b-red">Out</span>{% elif r.status == 'low' %}<span class="badge b-amber">Low</span>{% elif r.status == 'ok' %}<span class="badge b-green">OK</span>{% else %}<span class="badge b-grey">No stock</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+      {% if cur %}<form method="post" action="{% url 'stock_adjust' ing.pk %}" class="row" style="padding:12px;flex-wrap:wrap">{% csrf_token %}
+        <input class="input" name="delta" type="number" step="0.001" placeholder="± qty ({{ ing.unit }})" required style="width:130px">
+        <select class="input" name="reason" style="width:130px"><option value="adjustment">Adjustment</option><option value="opening">Opening / add</option><option value="wastage">Wastage</option></select>
+        <input class="input" name="note" placeholder="Note" style="width:150px"><button class="btn">{% icon 'plus' 14 %} Update {{ cur.code }} stock</button></form>
+      {% else %}<div class="small muted" style="padding:12px">Select a branch (top bar) to adjust its stock.</div>{% endif %}</div>
+
+    <div class="card"><div class="card-h"><h2>Dishes that use {{ ing.name }}</h2></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Dish</th><th>Per portion</th><th class="right">Cost</th>{% if cur %}<th>Portions left ({{ cur.code }})</th>{% endif %}</tr></thead><tbody>
+      {% for d in dishes %}<tr><td><a href="{% url 'recipe' d.r.item_id %}"><b>{{ d.r.item.name }}</b></a><div class="small muted">{{ d.r.item.category.name }}</div></td><td>{{ d.r.quantity|num }} {{ ing.unit }}</td><td class="right">{{ d.cost|num }}</td>
+        {% if cur %}<td>{% if d.can is not None %}<span class="badge {% if d.can == 0 %}b-red{% elif d.can <= 5 %}b-amber{% else %}b-green{% endif %}">{{ d.can }}</span>{% endif %}</td>{% endif %}</tr>
+      {% empty %}<tr><td colspan="4" class="empty">Not used in any dish yet.</td></tr>{% endfor %}</tbody></table></div>
+      {% if can_edit and all_items %}<form method="post" class="row" style="padding:12px;flex-wrap:wrap">{% csrf_token %}
+        <select class="input" name="item" required style="max-width:240px"><option value="">Add to dish…</option>{% for i in all_items %}<option value="{{ i.pk }}">{{ i.name }}</option>{% endfor %}</select>
+        <input class="input" name="qty" type="number" step="0.0001" min="0" placeholder="Qty per portion ({{ ing.unit }})" required style="width:200px"><button class="btn primary">{% icon 'plus' 14 %} Add to recipe</button></form>{% endif %}</div>
+  </div>
+  <div class="card"><div class="card-h"><h2>Recent movements</h2></div><div class="tbl-wrap"><table class="tbl"><tbody>
+    {% for m in moves %}<tr><td class="small nowrap">{{ m.created_at|date:"d M H:i" }}</td><td>{{ m.reason }}<div class="small muted">{{ m.ref }} {{ m.note }}</div></td><td class="right"><b style="color:{% if m.change < 0 %}var(--red){% else %}var(--green){% endif %}">{{ m.change|num }}</b></td></tr>
+    {% empty %}<tr><td class="empty">No movements yet.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

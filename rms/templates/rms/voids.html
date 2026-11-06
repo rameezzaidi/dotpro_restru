@@ -1,0 +1,18 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Voids, cancels &amp; refunds</h1><p>Every removed item and cancelled order with the reason and who approved it.</p></div></div>
+<form method="get" class="filters">
+  <div><label class="small muted">From</label><br><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="small muted">To</label><br><input class="input" type="date" name="to" value="{{ f.to }}"></div>
+  <div><label class="small muted">Type</label><br><select class="input" name="kind"><option value="">All</option>{% for v, l in kinds %}<option value="{{ v }}" {% if f.kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <button class="btn">{% icon 'search' 16 %}</button></form>
+<div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap"><span class="badge b-blue">{{ agg.n }} voids / cancels</span><span class="badge b-red">Value {{ agg.t|default:0|floatformat:2 }}</span><span class="badge b-amber">Wastage (after cooking) {{ wasted|floatformat:2 }}</span></div>
+<div class="card tbl-wrap"><table class="tbl" data-server="1"><thead><tr><th>Time</th><th>Type</th><th>Order</th>{% if branch_all %}<th>{% tr "Branches" %}</th>{% endif %}<th>Item</th><th class="right" data-sum>Amount</th><th>Reason</th><th>By</th><th>Approved by</th></tr></thead><tbody>
+{% for v in page %}<tr><td class="small nowrap">{{ v.created_at|date:"d M, H:i" }}</td>
+  <td><span class="badge {% if v.kind == 'refund' %}b-violet{% elif v.kind == 'order' %}b-red{% else %}b-amber{% endif %}">{{ v.get_kind_display }}</span>{% if v.after_cooking %} <span class="badge b-grey">cooked</span>{% endif %}</td>
+  <td>{% if v.order_id %}<a href="{% url 'order_detail' v.order_id %}">{{ v.order_number }}</a>{% else %}{{ v.order_number }}{% endif %}</td>
+  {% if branch_all %}<td>{{ v.branch.code }}</td>{% endif %}
+  <td>{% if v.item_name %}{{ v.qty }} × {{ v.item_name }}{% else %}—{% endif %}</td><td class="right">{{ v.amount|floatformat:2 }}</td><td class="small">{{ v.reason }}</td>
+  <td>{{ v.user.display_name|default:"—" }}</td><td>{{ v.approved_by.display_name|default:"—" }}</td></tr>
+{% empty %}<tr><td colspan="9" class="empty">Nothing voided in this period.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

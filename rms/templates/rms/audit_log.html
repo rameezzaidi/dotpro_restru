@@ -1,0 +1,12 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>Audit Log</h1><p>Who changed what: menu, prices, staff, settings, stock master data and every login. Newest first.</p></div></div>
+<form method="get" class="filters"><div><label class="small muted">Action</label><br><select class="input" name="action"><option value="">All</option>{% for a in actions %}<option {% if f.action == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+<div><label class="small muted">What</label><br><select class="input" name="model"><option value="">All</option>{% for m in models %}<option {% if f.model == m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></div>
+<div><label class="small muted">Search</label><br><input class="input" name="q" value="{{ f.q }}" placeholder="user, item, text"></div><div style="align-self:end"><button class="btn">Filter</button></div></form>
+<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>When</th><th>User</th><th>Action</th><th>What</th><th>Details</th><th>IP</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.created_at|date:"d M H:i:s" }}</td><td>{{ r.username|default:"-" }}</td>
+<td><span class="badge {% if r.action == 'deleted' or r.action == 'login_failed' %}b-red{% elif r.action == 'created' %}b-green{% elif r.action == 'changed' %}b-amber{% else %}b-grey{% endif %}">{{ r.action }}</span></td>
+<td><b>{{ r.model }}</b> <span class="muted">{{ r.object_repr }}</span></td><td class="small">{{ r.changes }}</td><td class="small muted">{{ r.ip }}</td></tr>
+{% empty %}<tr><td colspan="6" class="empty">No entries.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% load static rms_tags %}<!doctype html>
+<html lang="{{ lang }}" dir="{{ lang_dir }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#faf6ef">
+<meta http-equiv="refresh" content="30"><title>Order {{ o.number }}</title><link rel="stylesheet" href="{% static 'rms/site.css' %}"></head>
+<body class="site">
+<header class="sx-hero" style="padding-bottom:22px"><span class="sx-brand"><span class="logo">{% icon 'store' 16 %}</span>{{ o.branch.name }}</span></header>
+<div class="sx-track"><div class="sx-tcard">
+  <div class="sx-no"><small>Order</small><h1>{{ o.number }}</h1>
+    <span class="sx-stat {% if o.status == 'completed' %}done{% elif o.status == 'cancelled' %}bad{% endif %}">{% status_badge o %}</span>
+    <p class="small" style="color:var(--mut);margin:12px 0 0">This page refreshes automatically</p></div>
+  {% if o.acceptance == "pending" and o.status == "new" %}<div class="sx-note">⏳ Waiting for the restaurant to confirm your order. This usually takes a minute.</div>
+  {% elif o.acceptance == "accepted" and o.status == "new" or o.acceptance == "accepted" and o.status == "preparing" %}<div class="sx-note">✓ Confirmed - ready in about {{ o.accept_eta }} minutes.</div>
+  {% elif o.acceptance == "rejected" %}<div class="sx-note bad">Sorry, the restaurant could not take this order: {{ o.cancel_reason }}. Any online payment will be refunded.</div>{% endif %}
+  {% if o.status != "cancelled" %}<div class="sx-steps">
+    {% for k, label in steps %}<div class="sx-step {% if forloop.counter0 <= step_i %}on{% endif %} {% if forloop.counter0 == step_i %}now{% endif %}"><i>{% if forloop.counter0 < step_i %}✓{% else %}{{ forloop.counter }}{% endif %}</i>{{ label }}</div>{% endfor %}</div>{% endif %}
+  <div class="sx-recp">{% for l in lines %}<div class="r"><span><em>{{ l.qty }}×</em>{{ l.name }}</span><span>{{ l.line_total|money:o.branch }}</span></div>{% endfor %}
+    <div class="tot"><span>Total</span><span>{{ o.total|money:o.branch }}</span></div></div>
+  <div class="sx-acts">
+    {% if pay_available %}<form method="post" action="{% url 'track_pay' o.number %}">{% csrf_token %}<button class="sx-btn">Pay online</button></form>{% endif %}
+    {% if o.status == "completed" %}<a class="sx-btn" href="{{ fb_url }}">★ Rate your order</a>{% endif %}
+    <a class="sx-btn ghost" href="{% url 'site_menu' o.branch.code %}">Order again</a>
+  </div></div>
+  <p class="sx-foot">Need help? {% if o.branch.phone %}Call <a href="tel:{{ o.branch.phone }}">{{ o.branch.phone }}</a>{% else %}Contact the branch{% endif %}</p></div></body></html>

@@ -1,0 +1,23 @@
+{% extends "rms/base.html" %}{% load rms_tags %}
+{% block content %}
+<div class="page-head"><div><h1>{{ title }}</h1></div><a class="btn" href="{{ back }}">← Back</a></div>
+<div class="card" style="max-width:860px"><div class="card-b">
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg error" style="margin-bottom:12px">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="grid-2">
+  {% for f in form %}
+    <div class="field {% if f.field.widget.input_type == 'checkbox' %}inline{% endif %}">
+      <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+      {{ f }}
+      {% if f.help_text %}<div class="help">{{ f.help_text }}</div>{% endif %}
+      {% for e in f.errors %}<div class="err">{{ e }}</div>{% endfor %}
+    </div>
+  {% endfor %}
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="btn primary" type="submit">{% icon 'check' 16 %} {% tr "Save" %}</button>
+    <a class="btn" href="{{ back }}">{% tr "Cancel" %}</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}
